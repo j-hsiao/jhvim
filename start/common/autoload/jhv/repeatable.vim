@@ -55,89 +55,103 @@
 "     n: :exec ''
 "     i: <C-r>=''<CR>
 "     v: ??
-"
+
 if abs(len("\<Ignore>") - len('<Ignore>')) <= 1
 	if abs(len("\<Cmd>") - len('<Cmd>')) > 1
-		nnoremap <silent> <Plug>noprepeatable; <Cmd>exec ''<CR>
-		vnoremap <silent> <Plug>noprepeatable; <Cmd>exec ''<CR>
-		xnoremap <silent> <Plug>noprepeatable; <Cmd>exec ''<CR>
-		snoremap <silent> <Plug>noprepeatable; <Cmd>exec ''<CR>
-		onoremap <silent> <Plug>noprepeatable; <Cmd>exec ''<CR>
-		inoremap <silent> <Plug>noprepeatable; <Cmd>exec ''<CR>
-		lnoremap <silent> <Plug>noprepeatable; <Cmd>exec ''<CR>
-		cnoremap <silent> <Plug>noprepeatable; <Cmd>exec ''<CR>
-		tnoremap <silent> <Plug>noprepeatable; <Cmd>exec ''<CR>
+		nnoremap <silent> <Plug>repeatable_nop; <Cmd>exec ''<CR>
+		vnoremap <silent> <Plug>repeatable_nop; <Cmd>exec ''<CR>
+		xnoremap <silent> <Plug>repeatable_nop; <Cmd>exec ''<CR>
+		snoremap <silent> <Plug>repeatable_nop; <Cmd>exec ''<CR>
+		onoremap <silent> <Plug>repeatable_nop; <Cmd>exec ''<CR>
+		inoremap <silent> <Plug>repeatable_nop; <Cmd>exec ''<CR>
+		lnoremap <silent> <Plug>repeatable_nop; <Cmd>exec ''<CR>
+		cnoremap <silent> <Plug>repeatable_nop; <Cmd>exec ''<CR>
+		tnoremap <silent> <Plug>repeatable_nop; <Cmd>exec ''<CR>
 	else
-		nnoremap <silent> <Plug>noprepeatable; :exec ''<CR>
-		inoremap <silent> <Plug>noprepeatable; <C-R>=''<CR>
+		nnoremap <silent> <Plug>repeatable_nop; :exec ''<CR>
+		inoremap <silent> <Plug>repeatable_nop; <C-R>=''<CR>
 		" Todo: the other modes?
 	endif
-	let s:noop = '"\<Plug>noprepeatable;"'
+	let s:noop = '"\<Plug>repeatable_nop;"'
 else
 	let s:noop = '"\<Ignore>"'
 endif
 
 
 "Create a repeatable mapping.
-"command: str, the map command for a non-repeatable vresion.  Use <> notation.
-"(see :h key-notation)
+"command: str, '[setting=value]... [M][nore]map [<map-args>] {lhs} {rhs}'
 "
-"Additional arguments: strings of form 'name=value' where value is a
-"json-encoded value.  NOTE: if json-decoding fails, then use the value as is
-"So, for example, mode=asdf, asdf is an invalid json string, so the string
-"'asdf' will be used instead.
-"	name: str, name for the mapping, which should be unique.
-"		Default to mode . '-mode-' . lhs
-"	repeat: str, the key (sequence) to press to repeat the mapping
-"	makemap: bool, create the map inside the function. Otherwise, return a
-"		string that can be `exec`ed to create the desired mapping.  This is
-"		mainly to handle the case where the mapping contains <SID> or s:.
-"		If that kind of mapping was created inside this function, then
-"		<SID>/s: would evaluate to repeatable.vim instead of wherever create()
-"		is being called from.
-"	mode: str, the mode after the intial mapping. For example, if mapping in
-"		V mode and running some command, it might end in normal mode.
-"		In that case, mode should be 'n'.  Otherwise, mode will be assumed to
-"		match the map command in command
-"	transition: str, key-sequence to transition from mode back into initial
-"		mode.  Example: vmap ending in normal mode, transition might be something
-"		like '[v'] to highlight the region in visual mode.  This way, when the
-"		mapping is repeated, it is in the correct mode and rhs can be activated.
-"		If omitted, then try making a best guess:
-"		map mode    default
-"		v   n       `<lt>v`>
-"		n   v       <C-\><C-N>
-"		i   n       a
-"		n   i       <C-\><C-N>
-function! jhv#repeatable#create(command, ...)
-	let repeat = '.'
+"`[M][nore]map ...` is a normal mapping command to make repeatable.
+"[setting=value]: Extra arguments to control mappings (no spaces around the =)
+"The value will be `json_decode()`ed or as is if failed.
+"
+"parsing:
+"	Each argument is treated as a unescaped-space-separated sequence of
+"	characters.  
+function! jhv#repeatable#create(command)
 	let makemap = 1
 	let mode = ''
-	let verbose = v:false
-	let transition = ''
 	let name = ''
-	for kp in a:000
-		let parsed = matchlist(kp, '[[:blank:]]*\([^[:blank:]=]*\)[[:blank:]]*=[[:blank:]]*\(.*[^[:blank:]]\)')
-		try
-			let value = json_decode(parsed[2])
-		catch
-			let value = parsed[2]
-		endtry
-		exec printf('let %s = value', parsed[1])
-	endfor
+	let repeat = '.'
+	let transition = ''
+	let verbose = v:false
+
+	let idx = 0
+	let end = len(a:command)
+	let lhs = ''
+	let mapcmd = []
+	while idx < end
+		let token = matchlist(a:command, '\m\(\(\\[[:blank:]]\|[^[:blank:]]\)*\)[[:blank:]]*', idx)
+		if match(token[1], '^[nvxsoilct]\?\(nore\)\?map$') >= 0
+			"1: *(nore)map
+			"3: list of <map-arguments>
+			"6: lhs
+			"8: rhs
+			let mapcmd = matchlist(
+				\ a:command[idx:],
+				\ '\m^\([nvxsoilct]\?\(nore\)\?map\)[[:blank:]]*\(\(<\(buffer\|nowait\|silent\|special\|script\|expr\|unique\)>[[:blank:]]*\)*\)\(\(\\[[:blank:]]\|[^[:blank:]]\)*\)[[:blank:]]*\(.\+\)')
+			break
+		else
+			let extra = matchlist(
+				\ substitute(token[1], '\\\(.\)', '\1', 'g'),
+				\ '\m^\(makemap\|mode\|name\|repeat\|transition\|verbose\)=\(.*\)')
+			call assert_true(!empty(extra))
+			if empty(extra)
+				throw printf('Bad settings token for jhv#repeatable#create: "%s"', token[1])
+			else
+				try
+					let value = json_decode(extra[2])
+				catch
+					let value = extra[2]
+				endtry
+				exec printf('let %s = value', extra[1])
+			endif
+		endif
+		let idx += len(token[0])
+	endwhile
+
 	if verbose
-		echom printf("Parsing command %s\n  repeat: %s\n  makemap: %s\n  mode: %s",
-			\ a:command, repeat, makemap, mode)
+		for k in split('makemap mode name repeat transition verbose')
+			echom printf('%s = "%s"', k, get(l:, k))
+		endfor
+	endif
+	if empty(mapcmd)
+		throw printf('Mapping command invalid: %s', a:command[idx:])
+	endif
+	if verbose
+		echom printf('map cmd: "%s"', mapcmd[1])
+		echom printf('map-arg: "%s"', mapcmd[3])
+		echom printf('map lhs: "%s"', mapcmd[6])
+		echom printf('map rhs: "%s"', mapcmd[8])
 	endif
 
-	if makemap && match(a:command, '\m[[:blank:]]\(s:\|<SID>\)[a-zA-Z0-9_]') >= 0
-		echom 'WARNING, jhv#repeatable#create should not be used with mappings containing s: or <SID>'
+	if makemap && match(mapcmd[8], '\m[[:blank:]]\(s:\|<SID>\)[a-zA-Z0-9_]') >= 0
+		echohl WarningMsg | echom 'WARNING: rhs contains <SID> or s:but makemap is true.'
 	endif
-	let parsed = matchlist(a:command, '\m^[[:blank:]]*\([a-z]\{-}map[[:blank:]]*\)\(\(<\(buffer\|nowait\|silent\|special\|script\|expr\|unique\)>[[:blank:]]*\)*\)\([^[:blank:]]*\)\(.*\)')
-	let mapcmd = parsed[1]
-	let mapargs = parsed[2]
-	let lhs = parsed[5]
-	let rhs = parsed[6]
+	let mapargs = mapcmd[3]
+	let lhs = mapcmd[6]
+	let rhs = mapcmd[8]
+	let mapcmd = mapcmd[1]
 
 	if empty(mode)
 		let mode = mapcmd[0]
@@ -147,16 +161,16 @@ function! jhv#repeatable#create(command, ...)
 	endif
 
 	let lhmap = printf(
-		\ '%smap %s <Plug>repeatable%s;<Plug>rrepeatable%s;',
+		\ '%smap %s <Plug>repeatable_map:%s;<Plug>repeatable_wait:%s;',
 		\ mapcmd[0], lhs, name, name)
-	let rhmap = printf('%s%s<Plug>repeatable%s;%s', mapcmd, mapargs, name, rhs)
+	let rhmap = printf('%s %s<Plug>repeatable_map:%s; %s', mapcmd, mapargs, name, rhs)
 	" Note, in old impl within Notes repo, I seem to have made some
 	" kind of observation where detecting keypress, NOT consuming next
 	" keypress, and returning empty string led to the next keypresses
 	" NOT being mapped to any mappings.  However, I cannot seem to
 	" reproduce this behavior.
 	let wtmap = printf(
-		\ '%smap <expr> <Plug>rrepeatable%s; getchar(1) == 0 ? (%s . "\<Plug>rrepeatable%s;") : ""',
+		\ '%smap <expr> <Plug>repeatable_wait:%s; getchar(1) == 0 ? (%s . "\<Plug>repeatable_wait:%s;") : ""',
 		\ mode, name, s:noop, escape(name, '<"\'))
 
 	if empty(transition)
@@ -174,7 +188,7 @@ function! jhv#repeatable#create(command, ...)
 	endif
 
 	let rpmap = printf(
-		\ '%smap <Plug>rrepeatable%s;%s %s%s',
+		\ '%smap <Plug>repeatable_wait:%s;%s %s%s',
 		\ mode, name, repeat, transition, lhs)
 	if verbose
 		echom 'lhmap: ' . lhmap

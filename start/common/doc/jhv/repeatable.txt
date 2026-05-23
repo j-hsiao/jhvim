@@ -1,0 +1,38 @@
+*repeatable.txt*	Make repeatable mappings.
+
+                                                            *:Repeatable*
+:Repeatable [setting=value]... Xmap [<map-args>...] {lhs} {rhs}
+
+    Xmap [<map-args>...] {lhs} {rhs} should be a map command.
+    This is what the map command would be if it was not repeatable.
+    In otherwords, just insert `:Repeatable` in front of the map
+    command with optional settings to make the mapping repeatable.
+    Settings value is parsed as json if possible.  Otherwise, it is
+    used as is.
+
+    settings:
+        makemap: |Boolean| create the main mapping and return an empty string.
+            Otherwise, create a string that can be used with `:exec`
+            This is mainly to handle the case where rhs contains |s:| or |<SID>|
+            If the mapping was created by |:Repeatable|, then these would
+            evaluate to repeatable.vim instead of the caller's script which
+            is the much more likely desired result.
+        mode: |string| the mode after the intial mapping. For example, if mapping in
+            V mode and running some command, it might end in normal mode.
+            In that case, mode should be "n".  Otherwise, mode will be assumed to
+            match the map command.
+        name: |string|, name for the mapping, which should be unique.
+            Default to M-mode-{lhs}.
+        repeat: |string|, the key (sequence) to press to repeat the mapping.
+            Defaults to "."
+        transition: |string|, key-sequence to transition from mode back into initial
+            mode.  Example: vmap ending in normal mode, transition might be something
+            like '[v'] to highlight the region in visual mode.  This way, when the
+            mapping is repeated, it is in the correct mode and rhs can be activated.
+            If omitted, then try making a best guess:
+            map mode    default
+            v   n       `<lt>v`>
+            n   v       <C-\><C-N>
+            i   n       a
+            n   i       <C-\><C-N>
+        verbose: |Boolean| echom commands for debugging.
