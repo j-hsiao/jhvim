@@ -1,38 +1,98 @@
 *repeatable.txt*	Make repeatable mappings.
 
-                                                            *:Repeatable*
-:Repeatable [setting=value]... Xmap [<map-args>...] {lhs} {rhs}
+								*:Repeatable*
+:Repeatable [setting=value ...] *map [<map-args>...] {lhs} {rhs}
+This is the User command version of |jhv#repeatable#create()|.  All arguments
+are treated as a single string and passed to |jhv#repeatable#create()|.
 
-    Xmap [<map-args>...] {lhs} {rhs} should be a map command.
-    This is what the map command would be if it was not repeatable.
-    In otherwords, just insert `:Repeatable` in front of the map
-    command with optional settings to make the mapping repeatable.
-    Settings value is parsed as json if possible.  Otherwise, it is
-    used as is.
+							*jhv#repeatable#create()*
+This function creates the set of mappings to have repeatable mapping behavior.
+It takes a single string argument of the form: >
+	[setting=value ...] [<SNR>D_] *map [<map-args>...] {lhs} {rhs}
+<If given multiple strings, they will be |join()|ed with a single space.
+The text after the settings represents the raw non-repeatable version of the
+mapping.  For most mappings, just insert `:Repeatable` in front of the map
+command to make the mapping repeatable.
 
-    settings:
-        makemap: |Boolean| create the main mapping and return an empty string.
-            Otherwise, create a string that can be used with `:exec`
-            This is mainly to handle the case where rhs contains |s:| or |<SID>|
-            If the mapping was created by |:Repeatable|, then these would
-            evaluate to repeatable.vim instead of the caller's script which
-            is the much more likely desired result.
-        mode: |string| the mode after the intial mapping. For example, if mapping in
-            V mode and running some command, it might end in normal mode.
-            In that case, mode should be "n".  Otherwise, mode will be assumed to
-            match the map command.
-        name: |string|, name for the mapping, which should be unique.
-            Default to M-mode-{lhs}.
-        repeat: |string|, the key (sequence) to press to repeat the mapping.
-            Defaults to "."
-        transition: |string|, key-sequence to transition from mode back into initial
-            mode.  Example: vmap ending in normal mode, transition might be something
-            like '[v'] to highlight the region in visual mode.  This way, when the
-            mapping is repeated, it is in the correct mode and rhs can be activated.
-            If omitted, then try making a best guess:
-            map mode    default
-            v   n       `<lt>v`>
-            n   v       <C-\><C-N>
-            i   n       a
-            n   i       <C-\><C-N>
-        verbose: |Boolean| echom commands for debugging.
+Settings are parsed as JSON if possible and use as is on failure.  Settings
+can also be given as separate string arguments before the map command string.
+For convenience, a string beginning with '<SNR>' followed by digits and an
+underscore will be assumed to be the value of |expand(|"<SID>") and treated as
+if it was prefixed with "SID=".  Settings MUST be before the command string.
+
+Each argument is seen as separated by unescaped whitespace.  After {rhs} is
+detected, then all the remainder is treated as part of {rhs}, even whitespace.
+
+settings~
+	makemap: |Boolean| Create the main mapping and return "".  Otherwise,
+		return a string with the mapping command for the user to |:exec|.
+	mode: |string| the mode after the intial mapping.  By default, this is
+		assumed to be the same as the mapping command.  However, some
+		mappings might change modes.  For these mappings, mode should
+		be set to the corresponding string (see |mode()|)
+	name: |string| name for the mapping, which should be unique.
+		Default to M{lhs} where M is the first letter of the map command used.
+	repeat: |string|, the key (sequence) to press to repeat the mapping.
+		Defaults to "."
+	SID: |string| Perform a simple substitution on any <SID> found in the
+		mapping command with this value.
+	transition: |string|, key-sequence to transition from mode back into
+		initial mode.  Example: vmap ending in normal mode, transition
+		might be something like '[v'] to highlight the region in visual
+		mode.  This way, when the mapping is repeated, it is in the
+		correct mode and rhs can be activated.  If omitted, then try
+		making a best guess:
+		map mode    default
+		v   n       `<lt>v`>
+		n   v       <C-\><C-N>
+		i   n       a
+		n   i       <C-\><C-N>
+	verbose: |Boolean| echom commands for debugging.
+
+Example 1 ~
+Print reltime in normal mode after pressing "asdf". Repeat with "k".  >
+	:Repeatable repeat=k nmap asdf :echo join(reltime(), ':')<CR>
+<Example 2~
+Use exec to repeat mappings containing <SID>. >
+	function s:MyFunc()
+		echo 'MyFunc was called!'
+	endfunction
+	exec 'Repeatable nmap asdf :call ' . expand('<SID>') . 'MyFunc()<CR>'
+<I have not yet found a reliable way to detect the <SID> of where the user
+command is called, so for mappings containing <SID>, options are using |:exec|
+or the SID setting.
+
+Details~
+repeatable.vim works by creating various intermediate mappings:
+1. *map %(lhs) <Plug>repeatable_map:%(name);<Plug>repeatable_wait:%(name);
+2. *map <Plug>repeatable_map:%(name); %(rhs)
+3. %(mode)map <expr> <Plug>repeatable_wait:%(name); getchar(1) == 0 ? "%(noop)\<Plug>repeatable_wait:%(name);" : ""
+4. %(mode)map <Plug>repeatable_wait:%(name);$(repeat) %(transition)%(lhs)
+
+%(varname) is replaced by whatever the setting is.
+	lhs: lhs of the map commandline
+	rhs: rhs of the map commandlin
+	noop: a no-op key-sequence, "\<Ignore>" if available.
+		Otherwise, a mapping to <Cmd>exec ''<CR> if <Cmd> is available
+		Otherwise <silent> mappings:
+			n -> :exec ''<CR>
+			i -> <C-R>=''<CR>
+			v -> g<C-G>
+
+How it works~
+Mapping 1 activates mapping 2 and then enters mapping 3.
+Mapping 2 just runs the {rhs} of the original mapping.
+Mapping 3 is intentionally ambiguous with mapping 4.  As a result, vim will
+	pause waiting for disambiguation between these two mappings.  If vim
+	disambiguates to mapping 3, then that means no extra key was pressed.
+	It first does an effective no-op command followed by re-enterring the ambiguous
+	state.  The %(noop) is necessary because otherwise, the mapping would be left-
+	|recursive_mapping| and it would just be taken literally without mapping.
+	An alternative could be an <expr> mapping that returns |nr2char(||getchar()|) so vim
+	would continuously wait until getting a character.  However, |getchar()| moves
+	the cursor into the status bar.  Using this recursive ambiguous method
+	keeps the cursor in the current text position.
+Mapping 4 just maps to mapping 1 after %(transition) to put vim back into the
+	appropraite mode before re-activating {rhs}.
+
+ vim:tw=78:ts=8:noet:ft=help:norl:
