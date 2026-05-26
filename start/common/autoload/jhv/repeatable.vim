@@ -15,9 +15,9 @@ if match("\<Ignore>", '<Ignore>') >= 0
 		vnoremap <silent> <Plug>repeatable_nop; g<C-G>
 		" Todo: the other modes?
 	endif
-	let s:noop = '"\<Plug>repeatable_nop;"'
+	let s:noop = '"<Bslash><lt>Plug>repeatable_nop;"'
 else
-	let s:noop = '"\<Ignore>"'
+	let s:noop = '"<Bslash><lt>Ignore>"'
 endif
 
 function! jhv#repeatable#create(...)
@@ -104,7 +104,7 @@ function! jhv#repeatable#create(...)
 	endif
 
 	let lhmap = printf(
-		\ '%smap %s <Plug>repeatable_map:%s;<Plug>repeatable_wait:%s;',
+		\ '%smap <silent> %s <Plug>repeatable_map:%s;<Plug>repeatable_wait:%s;',
 		\ mapmode, lhs, name, name)
 	let rhmap = printf('%s %s<Plug>repeatable_map:%s; %s', mapcmd, mapargs, name, rhs)
 	" Note, in old impl within Notes repo, I seem to have made some
@@ -113,9 +113,8 @@ function! jhv#repeatable#create(...)
 	" NOT being mapped to any mappings.  However, I cannot seem to
 	" reproduce this behavior.
 	let wtmap = printf(
-		\ '%smap <expr> <Plug>repeatable_wait:%s; getchar(1) == 0 ? (%s . "\<Plug>repeatable_wait:%s;") : ""',
-		\ mode, name, s:noop, escape(name, '<"\'))
-
+		\ '%smap <silent> <expr> <Plug>repeatable_wait:%s; getchar(1) == 0 ? (%s . "<Bslash><lt>Plug>repeatable_wait:%s;") : ""',
+		\ mode, name, s:noop, substitute(escape(substitute(name, '<', '<lt>', 'g'), '<\"'), '\', '<Bslash>', 'g'))
 	if empty(transition)
 		if mode != mapmode
 			if mode == 'n'
@@ -131,7 +130,7 @@ function! jhv#repeatable#create(...)
 	endif
 
 	let rpmap = printf(
-		\ '%smap <Plug>repeatable_wait:%s;%s %s%s',
+		\ '%smap <silent> <Plug>repeatable_wait:%s;%s %s%s',
 		\ mode, name, repeat, transition, lhs)
 	if verbose
 		echom 'lhmap: ' . lhmap
