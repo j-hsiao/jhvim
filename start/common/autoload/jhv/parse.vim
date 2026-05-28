@@ -7,18 +7,43 @@
 "5. lhs: the lhs of the map command
 "6. rhs: the rhs of the map command
 "7. ignored, this parsing uses matchlist() which always has 10 args on success.
+"
+"Optional arguments: start, count (see `:h matchlist()`)
+"Empty list if no match.
 function jhv#parse#Mapping(commandline, ...)
-	if a:0
-		let extra = a:000
-		if len(extra) < 2
-			call add(extra, 1)
-		endif
-	else
-		let extra = [0,1]
-	endif
-
+	let start = get(a:000, 0, 0)
+	let cnt = get(a:000, 1, 1)
 	return matchlist(
 		\ a:commandline,
 		\ '\m^\(\([nvxsoilct]\)\?\(nore\)\?map\)[[:blank:]]*\(\%([[:blank:]]*<\%(buffer\|nowait\|silent\|special\|script\|expr\|unique\)>\)*\)[[:blank:]]\+\(\%(\\[[:blank:]]\|[^[:blank:]]\)*\)[[:blank:]]\+\(.\+\)',
-		\ extra[0], extra[1])
+		\ start, cnt)
+endfunction
+
+"Split arguments on unescaped blanks and extract name=value args.
+"Return [args, idx] where args is a list of [name, value] pairs
+"and idx is the index of the first argument not matching name=value.
+"optional arguments:
+"	idx=0, starting index to start parsing name=value args.
+"	json=v:true: bool, decode the value as json if possible.
+function jhv#parse#PreArgs(str, ...)
+	let idx = get(a:000, 0, 0)
+	let json = get(a:000, 1, 1)
+	let settings = []
+	while idx < len(a:str)
+		let settingmatch = matchlist(a:str, '\m^[[:blank:]]*\([a-zA-Z_][a-zA-Z0-9_]*\)=\(\%(\\.\|[^[:blank:]]\)*\)[[:blank:]]*', idx)
+		if empty(settingmatch)
+			break
+		else
+			let value = substitute(settingmatch[2], '\m\\\(.\)', '\1', 'g')
+			if json
+				try
+					let value = json_decode(value)
+				catch
+				endtry
+			endif
+			call add(settings, [settingmatch[1], value])
+			let idx += len(settingmatch[0])
+		endif
+	endwhile
+	return [settings, idx]
 endfunction
