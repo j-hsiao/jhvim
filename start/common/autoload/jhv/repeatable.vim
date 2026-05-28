@@ -51,9 +51,8 @@ function! jhv#repeatable#create(...)
 		while idx < end
 			let token = matchlist(subcommand, '\m\(\(\\[[:blank:]]\|[^[:blank:]]\)*\)[[:blank:]]*', idx)
 			if match(token[1], '^[nvxsoilct]\?\(nore\)\?map$') >= 0
-				let [mapline, mapcmd, mapmode, mapargs, lhs, rhs; ignored] = matchlist(
-					\ substitute(subcommand[idx:], '<SID>', SID, 'g'),
-					\ '\m^\(\([nvxsoilct]\?\)\%(nore\)\?map\)[[:blank:]]*\(\%(<\%(buffer\|nowait\|silent\|special\|script\|expr\|unique\)>[[:blank:]]*\)*\)\(\%(\\[[:blank:]]\|[^[:blank:]]\)*\)[[:blank:]]*\(.\+\)')
+				let [mapline, mapcmd, mapmode, mapnore, mapargs, lhs, rhs; ignored] = jhv#parse#Mapping(
+					\ substitute(subcommand[idx:], '<SID>', SID, 'g'))
 				break
 			else
 				let extra = matchlist(
@@ -106,7 +105,7 @@ function! jhv#repeatable#create(...)
 	let lhmap = printf(
 		\ '%smap <silent> %s <Plug>repeatable_map:%s;<Plug>repeatable_wait:%s;',
 		\ mapmode, lhs, name, name)
-	let rhmap = printf('%s %s<Plug>repeatable_map:%s; %s', mapcmd, mapargs, name, rhs)
+	let rhmap = printf('%s %s <Plug>repeatable_map:%s; %s', mapcmd, mapargs, name, rhs)
 	" Note, in old impl within Notes repo, I seem to have made some
 	" kind of observation where detecting keypress, NOT consuming next
 	" keypress, and returning empty string led to the next keypresses
