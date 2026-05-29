@@ -9,19 +9,24 @@ are treated as a single string and passed to |jhv#repeatable#create()|.
 This function creates the set of mappings to have repeatable mapping behavior.
 It takes a single string argument of the form: >
 	[setting=value ...] [<SNR>D_] *map [<map-args>...] {lhs} {rhs}
-<If given multiple strings, they will be |join()|ed with a single space.
-The text after the settings represents the raw non-repeatable version of the
-mapping.  For most mappings, just insert `:Repeatable` in front of the map
-command to make the mapping repeatable.
+<If given multiple strings, they will effectively be |join()|ed with a single
+space.
 
-Settings are parsed as JSON if possible and use as is on failure.  Settings
-can also be given as separate string arguments before the map command string.
-For convenience, a string beginning with '<SNR>' followed by digits and an
-underscore will be assumed to be the value of |expand(|"<SID>") and treated as
-if it was prefixed with "SID=".  Settings MUST be before the command string.
+The string will be split into arguments which are sequences of non- whitespace
+characters.  Any character following a backslash will be treated as part of an
+argument.  Arguments will be parsed as settings from left to to right until
+the first argument that does not match the setting=value pattern.
 
-Each argument is seen as separated by unescaped whitespace.  After {rhs} is
-detected, then all the remainder is treated as part of {rhs}, even whitespace.
+An exception is if the argument matches '<SNR>[0-9]\+_', in which case this is
+assumed to be the value of `expand(`"<SID>") and is treated as the value of an
+'SID=value' argument.  This allows specifying SID without the need for string
+formatting or concatenation.
+
+Setting values are decoded as JSON if possible and used as is otherwise.
+
+The remaining text after the setting arguments is the raw map command.  Once
+{rhs} is detected, there will be no more argument splitting and any whitespace
+will be treated as part of the {rhs} argument.
 
 settings~
 	makemap: |Boolean| Create the main mapping and return "".  Otherwise,

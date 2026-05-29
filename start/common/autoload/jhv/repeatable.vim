@@ -15,9 +15,9 @@ if match("\<Ignore>", '<Ignore>') >= 0
 		vnoremap <silent> <Plug>repeatable_nop; g<C-G>
 		" Todo: the other modes?
 	endif
-	let s:noop = '"\<Plug>repeatable_nop;"'
+	let s:noop = '"<Bslash><lt>Plug>repeatable_nop;"'
 else
-	let s:noop = '"\<Ignore>"'
+	let s:noop = '"<Bslash><lt>Ignore>"'
 endif
 
 function! jhv#repeatable#create(...)
@@ -29,6 +29,7 @@ function! jhv#repeatable#create(...)
 			set cpo+=<
 		endtry
 	endif
+	let settingnames = ['makemap', 'mode', 'name', 'repeat', 'transition', 'verbose', 'SID']
 	let makemap = 1
 	let mode = ''
 	let name = ''
@@ -37,47 +38,36 @@ function! jhv#repeatable#create(...)
 	let verbose = v:false
 	let SID = '<SID>'
 
-	let lhs = ''
-	let mapcmd = ''
+	let mapcmd = []
 	for subcommand in a:000
 		if verbose
 			echom printf('Processing subcommand: %s', subcommand)
 		endif
-		let idx = 0
-		let end = len(subcommand)
 		if !empty(mapcmd)
-			throw printf('Extra strings found after mapping command!: %s', subcommand)
+			call add(mapcmd, subcommand)
 		endif
-		while idx < end
-			let token = matchlist(subcommand, '\m\(\(\\[[:blank:]]\|[^[:blank:]]\)*\)[[:blank:]]*', idx)
-			if match(token[1], '^[nvxsoilct]\?\(nore\)\?map$') >= 0
-				let [mapline, mapcmd, mapmode, mapargs, lhs, rhs; ignored] = matchlist(
-					\ substitute(subcommand[idx:], '<SID>', SID, 'g'),
-					\ '\m^\(\([nvxsoilct]\?\)\%(nore\)\?map\)[[:blank:]]*\(\%(<\%(buffer\|nowait\|silent\|special\|script\|expr\|unique\)>[[:blank:]]*\)*\)\(\%(\\[[:blank:]]\|[^[:blank:]]\)*\)[[:blank:]]*\(.\+\)')
-				break
+		let [settings, idx] = jhv#parse#PreArgs(subcommand)
+		for [name, value] in settings
+			if index(settingnames, name) >= 0
+				exec printf('let %s = value', name)
 			else
-				let extra = matchlist(
-					\ substitute(token[1], '\\\(.\)', '\1', 'g'),
-					\ '\m^\(makemap\|mode\|name\|repeat\|transition\|verbose\|SID\)=\(.*\)')
-				if empty(extra)
-					if match(token[1], '\m^<SNR>[0-9]\+_$') >= 0
-						let SID=token[1]
-					else
-						throw printf('Bad settings token for jhv#repeatable#create: "%s"', token[1])
-					endif
-				else
-					try
-						let value = json_decode(extra[2])
-					catch
-						let value = extra[2]
-					endtry
-					exec printf('let %s = value', extra[1])
-				endif
+				throw printf('Unrecognized setting %s = %s', name, value)
 			endif
-			let idx += len(token[0])
-		endwhile
+		endfor
+		if idx != len(subcommand)
+			call add(mapcmd, subcommand[idx:])
+		endif
 	endfor
-
+	if verbose
+		echom printf('Effective map command parts: %s', mapcmd)
+	endif
+	let mapmatch = jhv#parse#Mapping(
+		\ substitute(join(mapcmd, ' '), '<SID>', SID, 'g'))
+	if empty(mapmatch)
+		throw printf('Invalid map command: %s', join(mapcmd, ' '))
+	else
+		let [mapline, mapcmd, mapmode, mapnore, mapargs, lhs, rhs; ignored] = mapmatch
+	endif
 	if verbose
 		for k in split('makemap mode name repeat transition verbose SID')
 			echom printf('%10s = "%s"', k, get(l:, k))
@@ -104,18 +94,17 @@ function! jhv#repeatable#create(...)
 	endif
 
 	let lhmap = printf(
-		\ '%smap %s <Plug>repeatable_map:%s;<Plug>repeatable_wait:%s;',
+		\ '%smap <silent> %s <Plug>repeatable_map:%s;<Plug>repeatable_wait:%s;',
 		\ mapmode, lhs, name, name)
-	let rhmap = printf('%s %s<Plug>repeatable_map:%s; %s', mapcmd, mapargs, name, rhs)
+	let rhmap = printf('%s %s <Plug>repeatable_map:%s; %s', mapcmd, mapargs, name, rhs)
 	" Note, in old impl within Notes repo, I seem to have made some
 	" kind of observation where detecting keypress, NOT consuming next
 	" keypress, and returning empty string led to the next keypresses
 	" NOT being mapped to any mappings.  However, I cannot seem to
 	" reproduce this behavior.
 	let wtmap = printf(
-		\ '%smap <expr> <Plug>repeatable_wait:%s; getchar(1) == 0 ? (%s . "\<Plug>repeatable_wait:%s;") : ""',
-		\ mode, name, s:noop, escape(name, '<"\'))
-
+		\ '%smap <silent> <expr> <Plug>repeatable_wait:%s; getchar(1) == 0 ? (%s . "<Bslash><lt>Plug>repeatable_wait:%s;") : ""',
+		\ mode, name, s:noop, substitute(escape(substitute(name, '<', '<lt>', 'g'), '<\"'), '\', '<Bslash>', 'g'))
 	if empty(transition)
 		if mode != mapmode
 			if mode == 'n'
@@ -131,7 +120,7 @@ function! jhv#repeatable#create(...)
 	endif
 
 	let rpmap = printf(
-		\ '%smap <Plug>repeatable_wait:%s;%s %s%s',
+		\ '%smap <silent> <Plug>repeatable_wait:%s;%s %s%s',
 		\ mode, name, repeat, transition, lhs)
 	if verbose
 		echom 'lhmap: ' . lhmap
