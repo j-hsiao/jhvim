@@ -1,0 +1,20 @@
+*extendmap.txt*	Add actions to existing maps.
+
+								*:ExtendMap*
+:ExtendMap [setting=value ...] *map [<map-args...] {lhs} {rhs}
+This is the User command version of |jhv#extendmap#ExtendMap()|. All arguments
+are treated as a single string and passed to that function.
+
+						*jhv#extendmap#ExtendMap()*
+This function adds a mapping command to the left or right of an existing map
+command.  If the map does not already exist, it will be created.
+
+To allow using the various different <map-arguments>, an intermediate mapping
+with {lhs} swapped out will be created.  The new {lhs} will be appended or
+prepended to the existing map command if any.  For example, the existing map
+could be <silent> but then the new map could exclude <silent>.  `mapset()`
+will be used to recreate the original map.  If it was non-recursive, then an
+additional intermediate mapping is created to hold the original.
+
+
+vim:tw=78:ts=8:noet:ft=help:norl:
