@@ -62,26 +62,25 @@ function! jhv#repeatable#Create(...)
 	if makemap && match(rhs, '\m[[:blank:]]\(s:\|<SID>\)[a-zA-Z0-9_]') >= 0
 		echohl WarningMsg | echom 'WARNING: rhs contains <SID> or s:but makemap is true.' | echohl None
 	endif
-
 	if empty(mode)
 		let mode = mapmode
 	endif
 	if empty(name)
-		let name = mapcmd[0] . lhs
+		let name = lhs
 	endif
 
 	let lhmap = printf(
-		\ '%smap <silent> %s <Plug>repeatable_map:%s;<Plug>repeatable_wait:%s;',
-		\ mapmode, lhs, name, name)
-	let rhmap = printf('%s %s <Plug>repeatable_map:%s; %s', mapcmd, mapargs, name, rhs)
+		\ '%smap <silent> %s <Plug>repeatable_map:%s:%s;<Plug>repeatable_wait:%s:%s;',
+		\ mapmode, lhs, mapmode, name, mapmode, name)
+	let rhmap = printf('%s %s <Plug>repeatable_map:%s:%s; %s', mapcmd, mapargs, mapmode, name, rhs)
 	" Note, in old impl within Notes repo, I seem to have made some
 	" kind of observation where detecting keypress, NOT consuming next
 	" keypress, and returning empty string led to the next keypresses
 	" NOT being mapped to any mappings.  However, I cannot seem to
 	" reproduce this behavior.
 	let wtmap = printf(
-		\ '%smap <silent> <expr> <Plug>repeatable_wait:%s; getchar(1) == 0 ? (%s . "<Bslash><lt>Plug>repeatable_wait:%s;") : ""',
-		\ mode, name, s:noop, substitute(escape(substitute(name, '<', '<lt>', 'g'), '<\"'), '\', '<Bslash>', 'g'))
+		\ '%smap <silent> <expr> <Plug>repeatable_wait:%s:%s; getchar(1) == 0 ? (%s . "<Bslash><lt>Plug>repeatable_wait:%s:%s;") : ""',
+		\ mode, mapmode, name, s:noop, mapmode, substitute(escape(substitute(name, '<', '<lt>', 'g'), '<\"'), '\', '<Bslash>', 'g'))
 	if empty(transition)
 		if mode != mapmode
 			if mode == 'n'
@@ -97,8 +96,8 @@ function! jhv#repeatable#Create(...)
 	endif
 
 	let rpmap = printf(
-		\ '%smap <silent> <Plug>repeatable_wait:%s;%s %s%s',
-		\ mode, name, repeat, transition, lhs)
+		\ '%smap <silent> <Plug>repeatable_wait:%s:%s;%s %s%s',
+		\ mode, mapmode, name, repeat, transition, lhs)
 	if verbose
 		echom 'lhmap: ' . lhmap
 		echom 'rhmap: ' . rhmap

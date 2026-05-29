@@ -31,12 +31,10 @@ will be treated as part of the {rhs} argument.
 settings~
 	makemap: |Boolean| Create the main mapping and return "".  Otherwise,
 		return a string with the mapping command for the user to |:exec|.
-	mode: |string| the mode after the intial mapping.  By default, this is
-		assumed to be the same as the mapping command.  However, some
-		mappings might change modes.  For these mappings, mode should
-		be set to the corresponding string (see |mode()|)
+	mode: |string| the mode after the intial mapping.  Default to the
+		* in *[nore]map, which is the map command used.
 	name: |string| name for the mapping, which should be unique.
-		Default to M{lhs} where M is the first letter of the map command used.
+		Default to {lhs}.
 	repeat: |string|, the key (sequence) to press to repeat the mapping.
 		Defaults to "."
 	SID: |string| Perform a simple substitution on any <SID> found in the
@@ -69,10 +67,11 @@ or the SID setting.
 
 Details~
 repeatable.vim works by creating various intermediate mappings:
-1. *map %(lhs) <Plug>repeatable_map:%(name);<Plug>repeatable_wait:%(name);
-2. *map <Plug>repeatable_map:%(name); %(rhs)
-3. %(mode)map <expr> <Plug>repeatable_wait:%(name); getchar(1) == 0 ? "%(noop)\<Plug>repeatable_wait:%(name);" : ""
-4. %(mode)map <Plug>repeatable_wait:%(name);$(repeat) %(transition)%(lhs)
+1. *map %(lhs) <Plug>repeatable_map:%(mapmode):%(name);<Plug>repeatable_wait:%(mapmode):%(name);
+2. *map <Plug>repeatable_map:%(mapmode):%(name); %(rhs)
+3. %(mode)map <expr> <Plug>repeatable_wait:%(mapmode):%(name);
+	\ getchar(1) == 0 ? "%(noop)\<Plug>repeatable_wait:%(mapmode):%(name);" : ""
+4. %(mode)map <Plug>repeatable_wait:%(mapmode):%(name);$(repeat) %(transition)%(lhs)
 
 %(varname) is replaced by whatever the setting is.
 	lhs: lhs of the map commandline
@@ -83,6 +82,12 @@ repeatable.vim works by creating various intermediate mappings:
 			n -> :exec ''<CR>
 			i -> <C-R>=''<CR>
 			v -> g<C-G>
+	mode: mode setting
+	name: name setting
+	mapmode: prefix of map command. example: for "inoremap", it will be "i"
+		and for "map", it will be ""
+	repeat: The repeat setting.
+	transition: The transition setting.
 
 How it works~
 Mapping 1 activates mapping 2 and then enters mapping 3.
