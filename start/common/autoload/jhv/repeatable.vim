@@ -29,6 +29,7 @@ function! jhv#repeatable#create(...)
 			set cpo+=<
 		endtry
 	endif
+	let settingnames = ['makemap', 'mode', 'name', 'repeat', 'transition', 'verbose', 'SID']
 	let makemap = 1
 	let mode = ''
 	let name = ''
@@ -37,46 +38,36 @@ function! jhv#repeatable#create(...)
 	let verbose = v:false
 	let SID = '<SID>'
 
-	let lhs = ''
-	let mapcmd = ''
+	let mapcmd = []
 	for subcommand in a:000
 		if verbose
 			echom printf('Processing subcommand: %s', subcommand)
 		endif
-		let idx = 0
-		let end = len(subcommand)
 		if !empty(mapcmd)
-			throw printf('Extra strings found after mapping command!: %s', subcommand)
+			call add(mapcmd, subcommand)
 		endif
-		while idx < end
-			let token = matchlist(subcommand, '\m\(\(\\[[:blank:]]\|[^[:blank:]]\)*\)[[:blank:]]*', idx)
-			if match(token[1], '^[nvxsoilct]\?\(nore\)\?map$') >= 0
-				let [mapline, mapcmd, mapmode, mapnore, mapargs, lhs, rhs; ignored] = jhv#parse#Mapping(
-					\ substitute(subcommand[idx:], '<SID>', SID, 'g'))
-				break
+		let [settings, idx] = jhv#parse#PreArgs(subcommand)
+		for [name, value] in settings
+			if index(settingnames, name) >= 0
+				exec printf('let %s = value', name)
 			else
-				let extra = matchlist(
-					\ substitute(token[1], '\\\(.\)', '\1', 'g'),
-					\ '\m^\(makemap\|mode\|name\|repeat\|transition\|verbose\|SID\)=\(.*\)')
-				if empty(extra)
-					if match(token[1], '\m^<SNR>[0-9]\+_$') >= 0
-						let SID=token[1]
-					else
-						throw printf('Bad settings token for jhv#repeatable#create: "%s"', token[1])
-					endif
-				else
-					try
-						let value = json_decode(extra[2])
-					catch
-						let value = extra[2]
-					endtry
-					exec printf('let %s = value', extra[1])
-				endif
+				throw printf('Unrecognized setting %s = %s', name, value)
 			endif
-			let idx += len(token[0])
-		endwhile
+		endfor
+		if idx != len(subcommand)
+			call add(mapcmd, subcommand[idx:])
+		endif
 	endfor
-
+	if verbose
+		echom printf('Effective map command parts: %s', mapcmd)
+	endif
+	let mapmatch = jhv#parse#Mapping(
+		\ substitute(join(mapcmd, ' '), '<SID>', SID, 'g'))
+	if empty(mapmatch)
+		throw printf('Invalid map command: %s', join(mapcmd, ' '))
+	else
+		let [mapline, mapcmd, mapmode, mapnore, mapargs, lhs, rhs; ignored] = mapmatch
+	endif
 	if verbose
 		for k in split('makemap mode name repeat transition verbose SID')
 			echom printf('%10s = "%s"', k, get(l:, k))
