@@ -4,7 +4,7 @@ function s:MyFunction()
 endfunction
 
 " Repeatable call a script-local function.
-call jhv#repeatable#create(
+call jhv#repeatable#Create(
 	\ expand('<SID>'), 'nmap asdf :call <SID>MyFunction()<CR>')
 
 function s:RepeatableTestEchoRange() range

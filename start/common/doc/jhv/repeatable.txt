@@ -2,10 +2,10 @@
 
 								*:Repeatable*
 :Repeatable [setting=value ...] *map [<map-args>...] {lhs} {rhs}
-This is the User command version of |jhv#repeatable#create()|.  All arguments
-are treated as a single string and passed to |jhv#repeatable#create()|.
+This is the User command version of |jhv#repeatable#Create()|.  All arguments
+are treated as a single string and passed to |jhv#repeatable#Create()|.
 
-							*jhv#repeatable#create()*
+							*jhv#repeatable#Create()*
 This function creates the set of mappings to have repeatable mapping behavior.
 It takes a single string argument of the form: >
 	[setting=value ...] [<SNR>D_] *map [<map-args>...] {lhs} {rhs}
