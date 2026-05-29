@@ -22,6 +22,8 @@ endfunction
 "Split arguments on unescaped blanks and extract name=value args.
 "Return [args, idx] where args is a list of [name, value] pairs
 "and idx is the index of the first argument not matching name=value.
+"Additionally, any token matching '<SNR>[0-9]\+_' will be treated as
+"a name=value pair with name as 'SID'
 "optional arguments:
 "	idx=0, starting index to start parsing name=value args.
 "	json=v:true: bool, decode the value as json if possible.
@@ -30,9 +32,15 @@ function jhv#parse#PreArgs(str, ...)
 	let json = get(a:000, 1, 1)
 	let settings = []
 	while idx < len(a:str)
-		let settingmatch = matchlist(a:str, '\m^[[:blank:]]*\([a-zA-Z_][a-zA-Z0-9_]*\)=\(\%(\\.\|[^[:blank:]]\)*\)[[:blank:]]*', idx)
+		let settingmatch = matchlist(a:str, '\m^[[:blank:]]*\([a-zA-Z_][a-zA-Z0-9_]*\)=\(\%(\\.\|[^[:blank:]]\)*\)\%([[:blank:]]\+\|$\)', idx)
 		if empty(settingmatch)
-			break
+			let settingmatch = matchlist(a:str, '\m^[[:blank:]]*\(<SNR>[0-9]\+_\)\%([[:blank:]]\+\|$\)', idx)
+			if empty(settingmatch)
+				break
+			else
+				call add(settings, ['SID', settingmatch[1]])
+				let idx += len(settingmatch[0])
+			endif
 		else
 			let value = substitute(settingmatch[2], '\m\\\(.\)', '\1', 'g')
 			if json
