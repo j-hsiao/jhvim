@@ -1,5 +1,5 @@
-function s:ExtendName(base, mode)
-	let pattern = printf('<Plug>ExtendMap%s_%%d_%s;', a:mode, a:base)
+function s:ExtendName(name, mode)
+	let pattern = printf('<Plug>ExtendMap:%s:%%d:%s;', a:mode, a:name)
 	let i = 0
 	while !empty(maparg(printf(pattern, i), a:mode))
 		let i += 1
@@ -26,18 +26,33 @@ function jhv#extendmap#ExtendMap(...)
 	let mapmatch = jhv#parse#Mapping(substitute(mapcmd, '<SID>', SID, 'g'))
 	if empty(mapmatch)
 		throw printf('Invalid map command: %s', join(mapcmd, ' '))
-	else
-		let [mapline, mapcmd, mapmode, mapnore, mapargs, lhs, rhs; ignored] = mapmatch
 	endif
+	let [mapline, mapcmd, mapmode, mapnore, mapargs, lhs, rhs; ignored] = mapmatch
+	if empty(name)
+		let name = lhs
+	endif
+	if verbose
+		for [name, value] in items(settings)
+			echom printf('%s: %s', name, value)
+		endfor
+	endif
+
 	let mapdict = maparg(lhs, mapmode, v:false, v:true)
 	let plugname = s:ExtendName(name, mapmode)
+	if verbose
+		echom printf('Extend map with intermediate lhs %s', plugname)
+	endif
 	execute printf('%s%smap %s %s %s', mapmode, mapnore, mapargs, plugname, rhs)
 	if empty(mapdict)
 		execute printf('%smap %s %s', mapmode, lhs, plugname)
 	elseif mapdict['noremap']
 		let oname = s:ExtendName(name, mapmode)
+		if verbose
+			echom printf('Original map to intermediate lhs %s', oname)
+		endif
 		let mapdict['lhs'] = oname
-		mapset(mapdict)
+		let mapdict['lhsraw'] = substitute(oname, '<Plug>', "\<Plug>", 'g')
+		call mapset(mapdict['mode'], v:false, mapdict)
 		if before
 			execute printf('%smap %s %s%s', mapmode, lhs, plugname, oname)
 		else

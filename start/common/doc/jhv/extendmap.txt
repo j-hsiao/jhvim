@@ -9,12 +9,45 @@ are treated as a single string and passed to that function.
 This function adds a mapping command to the left or right of an existing map
 command.  If the map does not already exist, it will be created.
 
-To allow using the various different <map-arguments>, an intermediate mapping
-with {lhs} swapped out will be created.  The new {lhs} will be appended or
-prepended to the existing map command if any.  For example, the existing map
-could be <silent> but then the new map could exclude <silent>.  `mapset()`
-will be used to recreate the original map.  If it was non-recursive, then an
-additional intermediate mapping is created to hold the original.
+Settings~
+	before: bool, the new {rhs} should go before the original.
+	name: a name, defaults to {lhs}
+	SID: |expand(|'<SID>') to allow use of <SID> in {rhs}.
+	verbose: bool, echom info
 
+Implementation~
+The {rhs} mappings will be assigned to an intermediate generated {lhs}.  This
+intermediate mapping allows the user to freely use various `map-arguments`.
+The generated intermediate {lhs} are concatenated and used as {rhs} for the
+actual mapping bound to the desired {lhs}.  If the existing mapping is nore,
+then the existing mapping is first mapped using a newly generated {lhs}.
+This means there are 2 generated {lhs} (one for the original and one for the
+current) which will be concatenated into the {rhs} for the mapping.
 
-vim:tw=78:ts=8:noet:ft=help:norl:
+Generated {lhs} have the form "<Plug>ExtendMap:%(mapmode):%(count):%(name)"
+where mapmode is the map prefix (ex. "i" for "imap", "" for "map"), count
+is just an incremented counter to ensure the generated {lhs} does not yet
+have an existing mapping, and name is the name setting.
+
+Example~
+Commands: >
+	nnoremap doit :echo "doit"<CR>
+	ExtendMap nnoremap doit :echo "I did it!"<CR>
+<possible result: >
+	nnoremap <Plug>ExtendMap:%(mapmode):%(count):%(name); :echo "doit"<CR>
+	nnoremap <Plug>ExtendMap:%(mapmode):%(count):%(name); :echo "I did it!"<CR>
+	nmap doit <Plug>ExtendMap:...;<Plug>ExtendMap:...;
+<
+Note: Prepending to a mapping created via |:Repeatable| will cause it to be
+repeated along with the original.  This is |:Repeatable| performs repetition
+by resolving back to the activating {lhs} sequence.  Appending to the end on
+the other hand will not wait for the repetition key because a key is already
+present after the original {rhs}.  If repetition is desired at the end,
+extend <Plug>repeatable_map:%(mapmode):%(name);
+
+Example~
+>
+	Repeatable nnoremap > :call MyIndent()<CR>
+	ExtendMap nnoremap <Plug>repeatable_map:n:>; :call DoExtra()<CR>
+
+ vim:tw=78:ts=8:noet:ft=help:norl:
