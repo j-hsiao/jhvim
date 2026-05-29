@@ -1,4 +1,4 @@
-" Add command for better repeatable mapping interface.
+" User command for repeatable mapping.
 
 if exists('g:loaded_plugin_jhv_repeatable')
 	finish
