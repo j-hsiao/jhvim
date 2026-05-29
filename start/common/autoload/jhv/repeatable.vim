@@ -20,49 +20,26 @@ else
 	let s:noop = '"<Bslash><lt>Ignore>"'
 endif
 
-function! jhv#repeatable#create(...)
+function! jhv#repeatable#Create(...)
 	if match(&cpo, '.*<.*') >= 0
 		set cpo-=<
 		try
-			return call('jhv#repeatable#create', a:000)
+			return call('jhv#repeatable#Create', a:000)
 		finally
 			set cpo+=<
 		endtry
 	endif
 	let settingnames = ['makemap', 'mode', 'name', 'repeat', 'transition', 'verbose', 'SID']
-	let makemap = 1
-	let mode = ''
-	let name = ''
-	let repeat = '.'
-	let transition = ''
-	let verbose = v:false
-	let SID = '<SID>'
+	let [settings, mapcmd] = call('jhv#parse#Settings', extend([settingnames], a:000))
+	let makemap = get(settings, 'makemap', 1)
+	let mode = get(settings, 'mode', '')
+	let name = get(settings, 'name', '')
+	let repeat = get(settings, 'repeat', '.')
+	let transition = get(settings, 'transition', '')
+	let verbose = get(settings, 'verbose', v:false)
+	let SID = get(settings, 'SID', '<SID>')
 
-	let mapcmd = []
-	for subcommand in a:000
-		if verbose
-			echom printf('Processing subcommand: %s', subcommand)
-		endif
-		if !empty(mapcmd)
-			call add(mapcmd, subcommand)
-		endif
-		let [settings, idx] = jhv#parse#PreArgs(subcommand)
-		for [name, value] in settings
-			if index(settingnames, name) >= 0
-				exec printf('let %s = value', name)
-			else
-				throw printf('Unrecognized setting %s = %s', name, value)
-			endif
-		endfor
-		if idx != len(subcommand)
-			call add(mapcmd, subcommand[idx:])
-		endif
-	endfor
-	if verbose
-		echom printf('Effective map command parts: %s', mapcmd)
-	endif
-	let mapmatch = jhv#parse#Mapping(
-		\ substitute(join(mapcmd, ' '), '<SID>', SID, 'g'))
+	let mapmatch = jhv#parse#Mapping(substitute(mapcmd, '<SID>', SID, 'g'))
 	if empty(mapmatch)
 		throw printf('Invalid map command: %s', join(mapcmd, ' '))
 	else
@@ -85,26 +62,25 @@ function! jhv#repeatable#create(...)
 	if makemap && match(rhs, '\m[[:blank:]]\(s:\|<SID>\)[a-zA-Z0-9_]') >= 0
 		echohl WarningMsg | echom 'WARNING: rhs contains <SID> or s:but makemap is true.' | echohl None
 	endif
-
 	if empty(mode)
 		let mode = mapmode
 	endif
 	if empty(name)
-		let name = mapcmd[0] . lhs
+		let name = lhs
 	endif
 
 	let lhmap = printf(
-		\ '%smap <silent> %s <Plug>repeatable_map:%s;<Plug>repeatable_wait:%s;',
-		\ mapmode, lhs, name, name)
-	let rhmap = printf('%s %s <Plug>repeatable_map:%s; %s', mapcmd, mapargs, name, rhs)
+		\ '%smap <silent> %s <Plug>repeatable_map:%s:%s;<Plug>repeatable_wait:%s:%s;',
+		\ mapmode, lhs, mapmode, name, mapmode, name)
+	let rhmap = printf('%s %s <Plug>repeatable_map:%s:%s; %s', mapcmd, mapargs, mapmode, name, rhs)
 	" Note, in old impl within Notes repo, I seem to have made some
 	" kind of observation where detecting keypress, NOT consuming next
 	" keypress, and returning empty string led to the next keypresses
 	" NOT being mapped to any mappings.  However, I cannot seem to
 	" reproduce this behavior.
 	let wtmap = printf(
-		\ '%smap <silent> <expr> <Plug>repeatable_wait:%s; getchar(1) == 0 ? (%s . "<Bslash><lt>Plug>repeatable_wait:%s;") : ""',
-		\ mode, name, s:noop, substitute(escape(substitute(name, '<', '<lt>', 'g'), '<\"'), '\', '<Bslash>', 'g'))
+		\ '%smap <silent> <expr> <Plug>repeatable_wait:%s:%s; getchar(1) == 0 ? (%s . "<Bslash><lt>Plug>repeatable_wait:%s:%s;") : ""',
+		\ mode, mapmode, name, s:noop, mapmode, substitute(escape(substitute(name, '<', '<lt>', 'g'), '<\"'), '\', '<Bslash>', 'g'))
 	if empty(transition)
 		if mode != mapmode
 			if mode == 'n'
@@ -120,8 +96,8 @@ function! jhv#repeatable#create(...)
 	endif
 
 	let rpmap = printf(
-		\ '%smap <silent> <Plug>repeatable_wait:%s;%s %s%s',
-		\ mode, name, repeat, transition, lhs)
+		\ '%smap <silent> <Plug>repeatable_wait:%s:%s;%s %s%s',
+		\ mode, mapmode, name, repeat, transition, lhs)
 	if verbose
 		echom 'lhmap: ' . lhmap
 		echom 'rhmap: ' . rhmap
