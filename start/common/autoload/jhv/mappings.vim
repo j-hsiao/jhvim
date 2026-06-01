@@ -21,7 +21,7 @@ else
 endif
 
 "Convert a string as typed for a mapping to a 
-function jhv#mappings#Map2eval(mpcmd, ...)
+function jhv#mappings#LHS2eval(mpcmd, ...)
 	if a:0
 		let quoteit = a:1
 	else
@@ -37,15 +37,31 @@ function jhv#mappings#Map2eval(mpcmd, ...)
 		\ '<End>', '<PageUp>', '<PageDown>', '<kHome>', '<kEnd>', '<kPageUp>',
 		\ '<kPageDown>', '<kPlus>', '<kMinus>', '<kMultiply>', '<kDivide>',
 		\ '<kEnter>', '<kPoint>', '<k[0-9]>', '<S-[^>]\+>', '<C-[^>]\+>', '<M-[^>]\+>',
-		\ '<A-[^>]\+>', '<D-[^>]\+>', '<t_[^>]\+>'
+		\ '<A-[^>]\+>', '<D-[^>]\+>', '<t_[^>]\+>', '<Plug>', '<Cmd>', '<Ignore>'
 	\ ]
 	let ret = substitute(escape(a:mpcmd, '\"'), printf('\m\(%s\)', join(subs, '\|')), '\\\1', 'g')
 	if quoteit
 		return printf('"%s"', ret)
 	endif
 	return ret
-
 endfunction
+
+function jhv#mappings#eval2RHS(mpstr)
+	let ret = a:mpstr
+	for [seq, replace] in [
+		\ ['<', '<lt>'],
+		\ ['\', '<Bslash>'],
+		\ ["\r", '<CR>'],
+		\ [' ', '<Space>'],
+		\ ["\t", '<Tab>'],
+		\ ['|', '<Bar>']
+	\ ]
+		let ret = substitute(ret, seq, replace, 'g')
+	endfor
+	return ret
+endfunction
+
+
 
 function! jhv#mappings#Repeatable(...)
 	let settingnames = ['makemap', 'mode', 'name', 'repeat', 'transition', 'verbose', 'SID']

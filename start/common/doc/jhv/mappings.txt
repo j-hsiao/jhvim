@@ -165,11 +165,18 @@ Mapping 4 just maps to mapping 1 after %(transition) to put vim back into the
 	appropraite mode before re-activating {rhs}.
 
 ===Helper Functions===
-							*jhv#mappings#Map2Raw()*
-jhv#mappings#Map2eval(mpcmd)
-Return an (unquoted) string literal that would match the input when passed to
-|eval()|.  Add backslashes in front of quotes and backslashes.  Also convert
-key-notation "<...>" to "\<...>".
+							*jhv#mappings#LHS2eval()*
+jhv#mappings#LHS2eval(mpcmd, quote=1)
+Return a string that would evaluate to a:mpcmd when passed to |eval()|.
+If quote, then the string is also surrounded with double quotes.  Otherwise
+it is given unquoted for insertion into a str.  Add backslashes in front of
+quotes and backslashes.  Also convert key-notation "<...>" to "\<...>".
+
+							*jhv#mappings#eval2RHS()*
+jhv#mappings#eval2RHS(mpstr)
+Convert a str into an appropriate string for use in the {rhs} of a mapping.
+Even when expr, {rhs} is still evaluated as a mapping so <lt> should be used
+in place of a single <.
 
 
 
