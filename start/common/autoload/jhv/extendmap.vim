@@ -7,6 +7,23 @@ function s:ExtendName(name, mode)
 	return printf(pattern, i)
 endfunction
 
+
+function s:MapSet(dct)
+	if exists('*mapset')
+		call mapset(a:dct['mode'], v:false, a:dct)
+	else
+		let mpcmd = [printf('%s%smap', a:dct['mode'], (a:dct['nore'] ? 'nore' : ''))]
+		for mapargu in ['buffer', 'nowait', 'silent', 'script', 'expr']
+			if get(a:dct, mapargu, v:false)
+				call add(mpcmd, printf('<%s>', mapargu))
+			endif
+		endfor
+		call add(mpcmd, a:dct['lhs'])
+		call add(mpcmd, substitute(a:dct['rhs'], '<SID>', printf('<SNR>%s_', a:dct['sid']), 'g'))
+		execute join(mpcmd, ' ')
+	endif
+endfunction
+
 function jhv#extendmap#ExtendMap(...)
 	if match(&cpo, '.*<.*') >= 0
 		set cpo-=<
@@ -16,12 +33,13 @@ function jhv#extendmap#ExtendMap(...)
 			set cpo+=<
 		endtry
 	endif
-	let settingnames = ['before', 'name', 'SID', 'verbose']
+	let settingnames = ['before', 'name', 'SID', 'verbose', 'rep']
 	let [settings, mapcmd] = call('jhv#parse#Settings', extend([settingnames], a:000))
 	let before = get(settings, 'before', v:false)
 	let name = get(settings, 'name', '')
 	let SID = get(settings, 'SID', '<SID>')
 	let verbose = get(settings, 'verbose', v:false)
+	let rep = get(settings, 'rep', v:true)
 
 	let mapmatch = jhv#parse#Mapping(substitute(mapcmd, '<SID>', SID, 'g'))
 	if empty(mapmatch)
@@ -38,6 +56,18 @@ function jhv#extendmap#ExtendMap(...)
 	endif
 
 	let mapdict = maparg(lhs, mapmode, v:false, v:true)
+	if rep && !empty(mapdict)
+		let repmatch = matchlist(
+			\ mapdict['rhs'],
+			\ '\m^<Plug>repeatable_map:\([a-z]\?:.*\);<Plug>repeatable_wait:\1;$')
+		if !empty(repmatch)
+			if verbose
+				echom printf('Extending repetable map: changing lhs from %s to <Plug>repeatable_map:%s;', lhs, repmatch[1])
+			endif
+			let lhs = printf('<Plug>repeatable_map:%s;', repmatch[1])
+			let mapdict = maparg(lhs, mapmode, v:false, v:true)
+		endif
+	endif
 	let plugname = s:ExtendName(name, mapmode)
 	if verbose
 		echom printf('Extend map with intermediate lhs %s', plugname)
@@ -52,7 +82,7 @@ function jhv#extendmap#ExtendMap(...)
 		endif
 		let mapdict['lhs'] = oname
 		let mapdict['lhsraw'] = substitute(oname, '<Plug>', "\<Plug>", 'g')
-		call mapset(mapdict['mode'], v:false, mapdict)
+		call s:MapSet(mapdict)
 		if before
 			execute printf('%smap %s %s%s', mapmode, lhs, plugname, oname)
 		else
@@ -71,6 +101,6 @@ function jhv#extendmap#ExtendMap(...)
 		else
 			let mapdict['rhs'] = printf('%s%s%s', mapdict['rhs'], sep, plugname)
 		endif
-		call mapset(mapdict['mode'], v:false, mapdict)
+		call s:MapSet(mapdict)
 	endif
 endfunction

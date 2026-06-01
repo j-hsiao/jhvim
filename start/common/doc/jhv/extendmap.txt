@@ -10,10 +10,11 @@ This function adds a mapping command to the left or right of an existing map
 command.  If the map does not already exist, it will be created.
 
 Settings~
-	before: bool, the new {rhs} should go before the original.
+	before: bool=v:false, the new {rhs} should go before the original.
 	name: a name, defaults to {lhs}
-	SID: |expand(|'<SID>') to allow use of <SID> in {rhs}.
-	verbose: bool, echom info
+	rep: bool=v:true, Handle |:Repeatable| mappings.
+	SID: pass |expand(|'<SID>') to allow use of <SID> in {rhs}.
+	verbose: bool=v:false, echom info
 
 Implementation~
 The {rhs} mappings will be assigned to an intermediate generated {lhs}.  This
@@ -38,16 +39,14 @@ Commands: >
 	nnoremap <Plug>ExtendMap:%(mapmode):%(count):%(name); :echo "I did it!"<CR>
 	nmap doit <Plug>ExtendMap:...;<Plug>ExtendMap:...;
 <
-Note: Prepending to a mapping created via |:Repeatable| will cause it to be
-repeated along with the original.  This is |:Repeatable| performs repetition
-by resolving back to the activating {lhs} sequence.  Appending to the end on
-the other hand will not wait for the repetition key because a key is already
-present after the original {rhs}.  If repetition is desired at the end,
-extend <Plug>repeatable_map:%(mapmode):%(name);
+Interaction with :Repeatable~
+Generally speaking, extending after a mapping created by repeatable will
+require extra handling.  This is because a repeatable mapping waits for a
+keypress to determien whether to repeat or not.  However, extending after such
+a mapping would make keypresses immediately available and thus cancel the
+waiting.  If the rhs of an existing mapping matches the typical repeatable
+mapping pattern, and the rep setting is v:true, then extend the repeatable
+mapping used to solely activate the repeatable rhs.
 
-Example~
->
-	Repeatable nnoremap > :call MyIndent()<CR>
-	ExtendMap nnoremap <Plug>repeatable_map:n:>; :call DoExtra()<CR>
 
  vim:tw=78:ts=8:noet:ft=help:norl:

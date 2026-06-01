@@ -12,4 +12,4 @@ Repeatable nnoremap f2 :echom printf('Repeatable! %s', join(reltime(), '.'))<CR>
 ExtendMap before=1 nnoremap f2 :echom 'Extend at beginning repeats with command.'<CR>
 
 Repeatable nnoremap f3 :echom printf('Repeatable! %s', join(reltime(), '.'))<CR>
-ExtendMap name=f3 nnoremap <Plug>repeatable_map:n:f3; :echom 'Extend plug allows repeat at end.'<CR>
+ExtendMap nnoremap f3 :echom 'Extend plug allows repeat at end.'<CR>
