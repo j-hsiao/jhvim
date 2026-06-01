@@ -103,22 +103,23 @@ function! jhv#mappings#Repeatable(...)
 	if empty(name)
 		let name = lhs
 	endif
+	let mapname = printf('<Plug>repeatable_map:%s:%s;', mapmode, name)
+	let waitname = printf('<Plug>repeatable_wait:%s:%s;', mapmode, name)
 
 	let lhmap = printf(
-		\ '%smap <special> <silent> %s <Plug>repeatable_map:%s:%s;<Plug>repeatable_wait:%s:%s;',
-		\ mapmode, lhs, mapmode, name, mapmode, name)
+		\ '%smap <special> <silent> %s %s%s', mapmode, lhs, mapname, waitname)
 	if match(mapargs, '<special>') < 0
 		let mapargs .= ' <special>'
 	endif
-	let rhmap = printf('%s %s <Plug>repeatable_map:%s:%s; %s', mapcmd, mapargs, mapmode, name, rhs)
+	let rhmap = printf('%s %s %s %s', mapcmd, mapargs, mapname, rhs)
 	" Note, in old impl within Notes repo, I seem to have made some
 	" kind of observation where detecting keypress, NOT consuming next
 	" keypress, and returning empty string led to the next keypresses
 	" NOT being mapped to any mappings.  However, I cannot seem to
 	" reproduce this behavior.
 	let wtmap = printf(
-		\ '%smap <silent> <special> <expr> <Plug>repeatable_wait:%s:%s; getchar(1) == 0 ? (%s . "<Bslash><lt>Plug>repeatable_wait:%s:%s;") : ""',
-		\ mode, mapmode, name, s:noop, mapmode, substitute(escape(substitute(name, '<', '<lt>', 'g'), '<\"'), '\', '<Bslash>', 'g'))
+		\ '%smap <silent> <special> <expr> %s getchar(1) == 0 ? (%s . "%s") : ""',
+		\ mode, waitname, s:noop, jhv#mappings#eval2RHS(jhv#mappings#LHS2eval(waitname, 0)))
 	if empty(transition)
 		if mode != mapmode
 			if mode == 'n'
@@ -134,8 +135,8 @@ function! jhv#mappings#Repeatable(...)
 	endif
 
 	let rpmap = printf(
-		\ '%smap <special> <silent> <Plug>repeatable_wait:%s:%s;%s %s%s',
-		\ mode, mapmode, name, repeat, transition, lhs)
+		\ '%smap <special> <silent> %s%s %s%s',
+		\ mode, waitname, repeat, transition, lhs)
 	if verbose
 		echom 'lhmap: ' . lhmap
 		echom 'rhmap: ' . rhmap
@@ -164,10 +165,26 @@ function s:ExtendName(name, mode)
 endfunction
 
 function s:MapSet(dct)
-	if exists('*mapset')
+	" NOTE It seems like nmap ...
+	" to search for mappings uses the 'lhsraw' entry to the dict.
+	" However, if I just use "\<C-K>" as the lhsraw, then nmap will not find
+	" that mapping.  Only if lhsraw is "\x80\xfc\<C-D>K" can it be found.
+	" But how to calculate lhsraw? Removing lhsraw and calling mapset does not
+	" recalculate the value of lhsraw.  It just errors out saying missing
+	" entries.
+	" Searching, apparently ?maybe? newer vim versions have a keytrans() and
+	" keycode() that could be used to convert '<...>' to the ?appropriate?
+	" lhsraw, but not sure...
+	" Probably prefer to have a proper lhsraw over the correct 'sid'
+	" since the 'sid' can be replaced anyways but *incorrect* lhsraw means
+	" that the mapping cannot be properly searched for with the *map commands.
+	" 8.2 has neither.
+	" 9.1 seems to have a keytrans() (lhsraw to lhs) but no keycode()
+	if exists('*keycode') && exists('*mapset')
+		let a:dct['lhsraw'] = keycode(a:dct['lhs'])
 		call mapset(a:dct['mode'], v:false, a:dct)
 	else
-		let mpcmd = [printf('%s%smap', a:dct['mode'], (a:dct['nore'] ? 'nore' : ''))]
+		let mpcmd = [printf('%s%smap', a:dct['mode'], (a:dct['noremap'] ? 'nore' : ''))]
 		for mapargu in ['buffer', 'nowait', 'silent', 'script', 'expr']
 			if get(a:dct, mapargu, v:false)
 				call add(mpcmd, printf('<%s>', mapargu))
@@ -179,13 +196,13 @@ function s:MapSet(dct)
 	endif
 endfunction
 
-function jhv#mappings#CopyMap(mode, lhs, newlhs)
-	let dct = maparg(a:lhs, a:mode, v:false, v:true)
+function jhv#mappings#CopyMap(mode, lhs, newlhs, ...)
+	let dct = a:0 > 0 ? a:1 : maparg(a:lhs, a:mode, v:false, v:true)
 	if empty(dct)
 		execute printf('%snoremap %s %s', a:mode, a:newlhs, a:lhs)
 	else
 		let dct['lhs'] = a:newlhs
-		execute printf('let dct[''lhsraw''] = "%s"', escape(a:newlhs, '<\"'))
+		let dct['lhsraw'] = eval(jhv#mappings#LHS2eval(a:newlhs))
 		call s:MapSet(dct)
 	endif
 endfunction
@@ -238,9 +255,7 @@ function jhv#mappings#ExtendMap(...)
 		if verbose
 			echom printf('Original map to intermediate lhs %s', oname)
 		endif
-		let mapdict['lhs'] = oname
-		let mapdict['lhsraw'] = substitute(oname, '\m^<Plug>', "\<Plug>")
-		call s:MapSet(mapdict)
+		call jhv#mappings#CopyMap(mapmode, lhs, oname, mapdict)
 		if before
 			execute printf('%smap <special> %s %s%s', mapmode, lhs, plugname, oname)
 		else
@@ -249,8 +264,7 @@ function jhv#mappings#ExtendMap(...)
 	else
 		if mapdict['expr']
 			let sep = ' . '
-			let plugname = printf('"%s"',
-				\ substitute(substitute(escape(plugname, '<"\'), '<', '<lt>', 'g'), '\', '<Bslash>', 'g'))
+			let plugname = jhv#mappings#eval2RHS(jhv#mappings#LHS2eval(plugname))
 		else
 			let sep = ''
 		endif
