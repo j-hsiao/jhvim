@@ -1,6 +1,6 @@
-call jhv#extendmap#ExtendMap('map <expr> asdf '':echom '' . ''"hello"<CR>''')
-call jhv#extendmap#ExtendMap('map asdf :echom "goodbye"<CR>')
-call jhv#extendmap#ExtendMap('before=1', 'map asdf :echom join(reltime(), ".")<CR>')
+call jhv#mappings#ExtendMap('map <expr> asdf '':echom '' . ''"hello"<CR>''')
+call jhv#mappings#ExtendMap('map asdf :echom "goodbye"<CR>')
+call jhv#mappings#ExtendMap('before=1', 'map asdf :echom join(reltime(), ".")<CR>')
 
 ExtendMap nnoremap asdf :echom "Footer"<CR>
 ExtendMap before=1 nnoremap asdf :echom "Header"<CR>

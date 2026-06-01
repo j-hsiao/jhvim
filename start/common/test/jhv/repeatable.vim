@@ -1,10 +1,10 @@
-"set cpo+=<
+set cpo+=<
 function s:MyFunction()
 	redraw | echo "script-local MyFunction was called!" . join(reltime(), ':')
 endfunction
 
 " Repeatable call a script-local function.
-call jhv#repeatable#Create(
+call jhv#mappings#Repeatable(
 	\ expand('<SID>'), 'nmap asdf :call <SID>MyFunction()<CR>')
 
 function s:RepeatableTestEchoRange() range

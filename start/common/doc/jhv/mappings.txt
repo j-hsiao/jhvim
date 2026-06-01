@@ -1,11 +1,69 @@
-*repeatable.txt*	Make repeatable mappings.
+*mappings.txt*	Manipulate mappings.
+
+===User Commands===
+								*:CopyMap*
+:CopyMap mode lhs newlhs
+Pass arguments to |jhv#mappings#CopyMap()|.
+
+								*:ExtendMap*
+:ExtendMap [setting=value ...] *map [<map-args...] {lhs} {rhs}
+This is the User command version of |jhv#mappings#ExtendMap()|. All arguments
+are treated as a single string and passed to that function.
 
 								*:Repeatable*
 :Repeatable [setting=value ...] *map [<map-args>...] {lhs} {rhs}
-This is the User command version of |jhv#repeatable#Create()|.  All arguments
-are treated as a single string and passed to |jhv#repeatable#Create()|.
+This is the User command version of |jhv#mappings#Repeatable()|.  All arguments
+are treated as a single string and passed to |jhv#mappings#Repeatable()|.
 
-							*jhv#repeatable#Create()*
+
+
+===Functions===
+						*jhv#mappings#CopyMap()*
+jhv#mappings#CopyMap(mode, lhs, newlhs)
+Copy the current mapping to {lhs} in the given mode to a {newlhs}.  This saves
+a copy of the mapping at the time of this call to {newlhs}.  Changes to the
+original {lhs} mapping will NOT be reflected in the {newlhs} mapping.
+
+						*jhv#mappings#ExtendMap()*
+This function adds a mapping command to the left or right of an existing map
+command.  If the map does not already exist, it will be created.
+
+Settings~
+	before: bool=v:false, the new {rhs} should go before the original.
+	name: a name, defaults to {lhs}
+	rep: bool=v:true, Handle |:Repeatable| mappings.
+	SID: pass |expand(|'<SID>') to allow use of <SID> in {rhs}.
+	verbose: bool=v:false, echom info
+
+Implementation~
+The {rhs} mappings will be assigned to an intermediate generated {lhs}.  This
+intermediate mapping allows the user to freely use various `map-arguments`.
+The generated intermediate {lhs} are concatenated and used as {rhs} for the
+actual mapping bound to the desired {lhs}.  If the existing mapping is nore,
+then the existing mapping is first mapped using a newly generated {lhs}.
+This means there are 2 generated {lhs} (one for the original and one for the
+current) which will be concatenated into the {rhs} for the mapping.
+
+Generated {lhs} have the form "<Plug>ExtendMap:%(mapmode):%(count):%(name)"
+where mapmode is the map prefix (ex. "i" for "imap", "" for "map"), count
+is just an incremented counter to ensure the generated {lhs} does not yet
+have an existing mapping, and name is the name setting.
+
+Example~
+Commands: >
+	nnoremap doit :echo "doit"<CR>
+	ExtendMap nnoremap doit :echo "I did it!"<CR>
+<possible result: >
+	nnoremap <Plug>ExtendMap:%(mapmode):%(count):%(name); :echo "doit"<CR>
+	nnoremap <Plug>ExtendMap:%(mapmode):%(count):%(name); :echo "I did it!"<CR>
+	nmap doit <Plug>ExtendMap:...;<Plug>ExtendMap:...;
+<
+Interaction with :Repeatable~
+If the rep setting is v:true, then handle calculate the {lhs} of Mapping 2 of
+the |:Repeatable| maps and extend that.  This way, the newly added {rhs} will
+be repeated together with whatever was originally the {rhs}
+
+						*jhv#mappings#Repeatable()*
 This function creates the set of mappings to have repeatable mapping behavior.
 It takes a single string argument of the form: >
 	[setting=value ...] [<SNR>D_] *map [<map-args>...] {lhs} {rhs}
@@ -95,14 +153,25 @@ Mapping 2 just runs the {rhs} of the original mapping.
 Mapping 3 is intentionally ambiguous with mapping 4.  As a result, vim will
 	pause waiting for disambiguation between these two mappings.  If vim
 	disambiguates to mapping 3, then that means no extra key was pressed.
-	It first does an effective no-op command followed by re-enterring the ambiguous
-	state.  The %(noop) is necessary because otherwise, the mapping would be left-
-	|recursive_mapping| and it would just be taken literally without mapping.
-	An alternative could be an <expr> mapping that returns |nr2char(||getchar()|) so vim
-	would continuously wait until getting a character.  However, |getchar()| moves
-	the cursor into the status bar.  Using this recursive ambiguous method
-	keeps the cursor in the current text position.
+	It first does an effective no-op command followed by re-enterring the
+	ambiguous state.  The %(noop) is necessary because otherwise, the
+	mapping would be left- |recursive_mapping| and it would just be taken
+	literally without mapping.  An alternative could be an <expr> mapping
+	that returns |nr2char(||getchar()|) so vim would continuously wait
+	until getting a character.  However, |getchar()| moves the cursor into
+	the status bar.  Using this recursive ambiguous method keeps the
+	cursor in the current text position.
 Mapping 4 just maps to mapping 1 after %(transition) to put vim back into the
 	appropraite mode before re-activating {rhs}.
+
+===Helper Functions===
+							*jhv#mappings#Map2Raw()*
+jhv#mappings#Map2eval(mpcmd)
+Return an (unquoted) string literal that would match the input when passed to
+|eval()|.  Add backslashes in front of quotes and backslashes.  Also convert
+key-notation "<...>" to "\<...>".
+
+
+
 
  vim:tw=78:ts=8:noet:ft=help:norl:
