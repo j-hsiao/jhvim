@@ -115,3 +115,32 @@ function jhv#parse#Settings(settings, ...)
 	endfor
 	return [ret, join(remainder, ' ')]
 endfunction
+
+"summary:
+"h: format-comments
+"comment types:
+"1. beginning of each line
+"2. first line only (like markdown list)
+"3. 3-part comment (beg, med, end)
+"
+"format:
+"flags:string,flags:string,...
+"
+"flags:
+"n  nesting is allowed
+"b  blank is required after string
+"f  only first line has string.
+"s  start of 3-piece
+"m  middle of 3-piece
+"e  end of 3-piece
+"l  start and end are left-aligned
+"r  right-aligned
+"O  Don't consider this for O command
+"x  short cut end 3-piece comment with last char of end after
+"   auto-middle-insertion.
+"[-]{digits}
+"
+function jhv#parse#ParseComments()
+
+
+endfunction
