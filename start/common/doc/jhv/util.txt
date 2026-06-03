@@ -1,0 +1,9 @@
+*util.txt*	Useful helper functions.
+						*jhv#util#InsertText()*
+jhv#util#InsertText(text, pos)
+Insert text at the given byte column on the current line without changing the
+relative cursor position.
+
+jhv#util#DeleteText(nbytes, pos)
+Remove text at the from pos to pos+nbytes on the current line without changing
+the relative cursor position.
