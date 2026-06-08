@@ -129,18 +129,77 @@ endfunction
 "flags:
 "n  nesting is allowed
 "b  blank is required after string
-"f  only first line has string.
+"f  only first line has string. (like bullet, so this isn't actually a comment...)
 "s  start of 3-piece
 "m  middle of 3-piece
 "e  end of 3-piece
 "l  start and end are left-aligned
 "r  right-aligned
-"O  Don't consider this for O command
+"O  Don't consider this for O command (don't think these ones are actually
+"   comments either...)
 "x  short cut end 3-piece comment with last char of end after
 "   auto-middle-insertion.
 "[-]{digits}
 "
-function jhv#parse#ParseComments()
+function! jhv#parse#ParseComments()
+	"comments and commentstring are unlikely to change while in the
+	"same buffer, so try cache result
+	let result = get(b:, 'jhv_parsed_comments', [])
+	if len(result)
+		return result
+	endif
+	let comparts = split(&l:comments, ',')
+	let pattern = ''
+	let idx = 0
+	let single = []
+	let multi = []
+	let parsepat = '\m\(\%([nbsmelrxfO]\|-\?[0-9]\+\)*\):\(.*\)'
+	while idx < len(comparts)
+		let [whole, flags, comment; ignored] = matchlist(comparts[idx], parsepat)
+		if match(flags, 's') >= 0
+			let [whole, mflags, mcomment; ignored] = matchlist(comparts[idx+1], parsepat)
+			let [whole, eflags, ecomment; ignored] = matchlist(comparts[idx+2], parsepat)
+			call add(multi, [flags, comment, mflags, mcomment, eflags, ecomment])
+			let idx += 3
+		else
+			call add(single, [flags, comment])
+			let idx += 1
+		endif
+	endwhile
+	return [single, multi]
+endfunction
 
+function! jhv#parse#SingleCommentRegex(parsed)
+	let [flags, comment] = a:parsed
+	if match(flags, 'b') >= 0
+		let spaced = '\+'
+	else
+		let spaced = '*'
+	endif
+	return printf(
+		\ '\m^\([[:blank:]]*\)\V\(%s\)\m\([[:blank:]]%s\)\(.*\)$',
+		\ escape(comment, '\/'),
+		\ spaced
+	\ )
+endfunction
 
+" Return single comment regex per part and an additional multi-line regex
+" for finding matching whole multi-part comment.
+function! jhv#parse#MultiCommentRegex(parsed)
+	let [sflag, scom, mflag, mcom, eflag, ecom] = a:parsed
+	let ret = [
+		\ jhv#parse#SingleCommentRegex([sflag, scom]),
+		\ jhv#parse#SingleCommentRegex([mflag, mcom]),
+		\ jhv#parse#SingleCommentRegex([eflag, ecom])
+	\ ]
+
+	let multis = ['\(%s\)\(\%%(%s\)*\)\(%s\)']
+	for item in ret
+		let check = substitute(item, '\m\\(', '\\%(', 'g')
+		let check = substitute(check, '\$$', '\\_$\\_.', '')
+		let check = substitute(check, '\(\\m\)\?\^', '\1\\_^', '')
+		call add(multis, check)
+	endfor
+	call add(ret, call('printf', multis))
+	return ret
 endfunction
