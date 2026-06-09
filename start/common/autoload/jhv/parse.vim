@@ -111,11 +111,14 @@ endfunction
 "x  short cut end 3-piece comment with last char of end after
 "   auto-middle-insertion.
 "[-]{digits}
-"
+
 function! jhv#parse#ParseComments(...)
 	"comments and commentstring are unlikely to change while in the
 	"same buffer, so try cache result
-	let result = get(b:, 'jhv_parsed_comments', [])
+	if !exists('b:jhv_parsed_comments')
+		let b:jhv_parsed_comments = {}
+	endif
+	let result = get(b:jhv_parsed_comments, &l:ft, [])
 	if len(result)
 		return result
 	endif
@@ -137,6 +140,7 @@ function! jhv#parse#ParseComments(...)
 			let idx += 1
 		endif
 	endwhile
+	let b:jhv_parsed_comments[&l:ft] = [single, multi]
 	return [single, multi]
 endfunction
 
