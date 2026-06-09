@@ -1,0 +1,91 @@
+*parse.txt*	Helpers for parsing strings
+
+							*jhv#parse#Mapping()*
+jhv#parse#Mapping(cmd[, startidx])
+Use |matchlist()| to parse a:cmd
+
+cmd: |string|, A string of the map command to parse.
+startidx=0: |integer| starting idx to begin searching.
+
+Return empty list on failure.
+Return list with the following groups on success.
+
+   0: command
+   1. mapcommand
+   2. mapmode (eg. "i" if "imap")
+   3. nore: "nore" if nonrecursive
+   4. mapargs: (eg. "<expr> <silent>")
+   5. lhs
+   6. rhs
+   7... ignored
+
+							*jhv#parse#PreArgs()*
+jhv#parse#PreArgs(cmd[, startidx[, asjson]])
+Parse "name=value" arguments at beginning of a:cmd.
+
+cmd: |string|, A string of the command to parse.
+startidx=0: |integer|, starting index to begin parsing.
+asjson=1: |Boolean|, "value" is parsed as json. Leave as a |string| if failed.
+
+Return [args, idx] where args is a dict of {name: value} and idx is the index
+of the first argument that does not match "name=value".
+
+Backslashes escape the next character.  Arguments are split by unescaped
+whitespace.  Additionally any token that is simply "<SNR>[0-9]+_" will be
+assumed to be the result of |expand(|"<SID>") and be treated as if prefixed
+with "SID=" (assigned in the dict as "SID": "...").
+
+							*jhv#parse#Settings()*
+jhv#parse#Settings(settings,...)
+Parse settings arguments.
+
+a:settings can be list, dict, or str.  They can be given in any order, but
+order matters.  Later arguments override previous arguments if there are any
+clashes.
+
+list: add valid setting names.  No given names means all are valid.
+dict: Add settings.  Overrides any already-parsed settings.
+str: Strings containing "name=value ..." to parse as settings.
+
+Return [settings, remainder] where settings is a dict of parsed settings
+and remainder is the concatenation of remaining strings after the first
+argument that does not match "name=value"
+
+						*jhv#parse#ParseComments()*
+jhv#parse#ParseComments()
+Parse 'comments' string.  See also |format-comments|
+
+Return [single, multi].
+single: list of [flags, text] of single-type comments.
+multi: list of [startflags, starttext, midflags, midtext, endflags, endtext]
+of 3-piece comments
+
+					*jhv#parse#SingleCommentRegex()*
+jhv#parse#SingleCommentRegex(parsed)
+Convert a "single" item from |jhv#parsed#ParseComments()| to a regex pattern.
+
+Return the regex pattern as a |string|.
+
+The regex can be used with |matchlist()| to produce the groups:
+  0. whole comment line
+  1. indentation before the comment string
+  2. the comment string
+  3. indentation after the string
+  4. the comment text
+
+"comment string" refers to the string sequence that begins the comment such as
+the // in >
+	// a C style comment
+<while "comment text" refers to the actual comment contents.
+
+					*jhv#parse#MultiCommentRegex()*
+jhv#parse#MultiCommentRegex(parsed)
+Convert a "multi" item from |jhv#parsed#ParseComments()| to regex patterns.
+
+Return a list of regex patterns [start, middle, end, whole].  start, middle,
+and end are the same as |jhv#parse#SingleCommentRegex()|.
+The "whole" regex is a multi-line regex that matches the 3-piece comment with
+each piece as the first non-blank text of each line.  It produces the groups:
+0: start comment line
+1: middle comment lines
+2: end comment line.
