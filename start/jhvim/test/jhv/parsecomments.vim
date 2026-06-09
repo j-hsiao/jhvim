@@ -47,15 +47,25 @@ call <SID>TestParsing()
 function! s:SearchComment()
 	let [single, multi] = jhv#parse#ParseComments()
 	for item in single
-		echo printf('%s: %s', item[1], searchpos(jhv#parse#SingleCommentRegex(item), 'n'))
-		echo printf('%s: %s', item[1], searchpos(jhv#parse#SingleCommentRegex(item), 'nb', 1))
+		echo printf('%s: %s', item[1], searchpos(jhv#parse#SingleCommentRegex(item), 'nc'))
+		echo printf('%s: %s', item[1], searchpos(jhv#parse#SingleCommentRegex(item), 'ncb', 1))
 	endfor
 
 	for item in multi
 		let reg = jhv#parse#MultiCommentRegex(item)
-		echo printf('%s: %s', item[1], searchpos(reg[3], 'n'))
-		echo printf('%s: %s', item[1], searchpos(reg[3], 'nb', 1))
+		echo printf('%s: %s', item[1], searchpos(reg[3], 'nc'))
+		echo printf('%s: %s', item[1], searchpos(reg[3], 'ncb', 1))
 	endfor
+
+	echo jhv#parse#IsSingleCommentRegex(single)
+	let result = search(
+		\ jhv#parse#IsSingleCommentRegex(single),
+		\ 'ncpb', line('.'))
+	if result
+		echo printf('is a single comment: %s', single[result-1])
+	else
+		echo 'not a comment'
+	endif
 endfunction
 
 

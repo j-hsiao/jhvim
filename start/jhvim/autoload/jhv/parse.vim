@@ -112,9 +112,7 @@ endfunction
 "   auto-middle-insertion.
 "[-]{digits}
 
-function! jhv#parse#ParseComments(...)
-	"comments and commentstring are unlikely to change while in the
-	"same buffer, so try cache result
+function jhv#parse#ParseComments(...)
 	let comparts = split(a:0 ? a:1 : &l:comments, ',')
 	let pattern = ''
 	let idx = 0
@@ -136,7 +134,7 @@ function! jhv#parse#ParseComments(...)
 	return [single, multi]
 endfunction
 
-function! jhv#parse#SingleCommentRegex(parsed)
+function jhv#parse#SingleCommentRegex(parsed)
 	let [flags, comment] = a:parsed
 	if match(flags, 'b') >= 0
 		let spaced = '\+'
@@ -150,7 +148,19 @@ function! jhv#parse#SingleCommentRegex(parsed)
 	\ )
 endfunction
 
-function! jhv#parse#MultiCommentRegex(parsed)
+function jhv#parse#IsSingleCommentRegex(singles)
+	let parts = ['\(']
+	for item in a:singles
+		let pat = jhv#parse#SingleCommentRegex(item)
+		let pat = substitute(pat, '\m\\(', '\\%(', 'g')
+		call add(parts, pat)
+		call add(parts, '\|')
+	endfor
+	let parts[-1] = '\)'
+	return join(parts, '')
+endfunction
+
+function jhv#parse#MultiCommentRegex(parsed)
 	let [sflag, scom, mflag, mcom, eflag, ecom] = a:parsed
 	let ret = [
 		\ jhv#parse#SingleCommentRegex([sflag, scom]),
@@ -163,7 +173,6 @@ function! jhv#parse#MultiCommentRegex(parsed)
 	let startreg = substitute(startreg, '\m\\(', '\\%(', 'g')
 	let startreg = substitute(startreg, '\m\$$', '', '')
 	let startreg = substitute(startreg, '\m^\%(\\m\)\?\^', '', '')
-
 
 	let midreg = substitute(midreg, '\m\\(', '\\%(', 'g')
 	let midreg = substitute(midreg, '\m\$$', '', '')
