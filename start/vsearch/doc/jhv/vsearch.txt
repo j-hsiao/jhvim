@@ -1,0 +1,13 @@
+*vsearch.txt*	Visual mode searching.
+
+								*v_star* *v_#*
+After highlighting, search forward/backward the selected text.
+This allows 'ignorecase'.
+
+					*v_<Leader>-star* *v_<Leader>-#*
+After highlighting, search forward/backward EXACTLY the selected text.
+
+							*<Leader>-CTRL-]*
+Jump to the notes heading.  The heading matches the pattern:
+-[0-9xX]\+\(\.[0-9xX]+\)*- surrounded by lines of a single
+repeated character, possibly indented.
