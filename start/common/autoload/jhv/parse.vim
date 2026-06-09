@@ -176,6 +176,6 @@ function! jhv#parse#MultiCommentRegex(parsed)
 	let endreg = substitute(endreg, '\m\\(', '\\%(', 'g')
 	let endreg = substitute(endreg, '\m^\%(\\m\)\?\^', '\\%(\\_$\\_.\\_^\\)\\?', '')
 
-	call add(ret, printf('\m^\(%%s\)\(\%%(%%s\)*\)\(%%s\)', startreg, midreg, endreg))
+	call add(ret, printf('\m^\(%s\)\(\%%(%s\)*\)\(%s\)', startreg, midreg, endreg))
 	return ret
 endfunction
