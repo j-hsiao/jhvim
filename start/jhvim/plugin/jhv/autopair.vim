@@ -1,0 +1,5 @@
+call jhv#autopair#Add("'", "'", 'b')
+call jhv#autopair#Add('"', '"', 'b')
+call jhv#autopair#Add('(', ')', 'r')
+call jhv#autopair#Add('[', ']')
+call jhv#autopair#Add('{', '}')

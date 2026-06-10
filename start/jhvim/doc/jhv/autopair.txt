@@ -1,0 +1,22 @@
+*autopair.txt* 	Simple automatic insertion of pairs when typing.
+
+							*jhv#autopair#Add()*
+jhv#autopair#Add(c1, c2[, flags])
+Add a pair of characters to handle.  Whenever c1 is inserted, c2 is also
+automatically inserted after the current cursor position.  Whenever the
+cursor is on c2 and c2 is inserted, then step over c2 instead of inserting
+c2.  The effect is that typing is as normal, but the character pairs are
+maintained if typing is cancelled.  This is just a minor convenience for
+example, to keep parentheses closed when many nested parentheses are involved.
+
+Default added pairs are: [], {}, (), '', ""
+
+flags:
+  'b': Insert the item if preceeded by a backslash rather than step over.
+  'r': This is a regex-like item.  If preceded by a backslash, also add
+       a backslash to the closing item. For example: '\(\)'
+
+NOTE: This is just a simple implementation.  It could be a lot more complex
+depending on filetype etc.  For example, tcl has "" as quoted strings, but
+also {}.  most languages have "" and '', and some allow backslash escapes
+within '' but others do not.
