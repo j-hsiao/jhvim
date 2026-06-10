@@ -1,7 +1,7 @@
 *autopair.txt* 	Simple automatic insertion of pairs when typing.
 
 							*jhv#autopair#Add()*
-jhv#autopair#Add(c1, c2[, flags])
+jhv#autopair#Add(c1, c2[, flags...])
 Add a pair of characters to handle.  Whenever c1 is inserted, c2 is also
 automatically inserted after the current cursor position.  Whenever the
 cursor is on c2 and c2 is inserted, then step over c2 instead of inserting
@@ -11,10 +11,17 @@ example, to keep parentheses closed when many nested parentheses are involved.
 
 Default added pairs are: [], {}, (), '', ""
 
-flags:
-  'b': Insert the item if preceeded by a backslash rather than step over.
+Flags are strings of the form [filetype,...]=flags
+flags can be divided into opening (c1) and closing (c2).
+opening flags:
+  'W': Only complete the pair if followed by non-word.  Otherwise always open.
   'r': This is a regex-like item.  If preceded by a backslash, also add
        a backslash to the closing item. For example: '\(\)'
+closing flags:
+  'b': Insert the item if preceeded by a backslash rather than step over.
+both:
+  'f': force map overwrite if already exist.  Otherwise |ExtendMap|
+  'c': closing only (ex, for bslash in to allow bslash stepping for regex)
 
 NOTE: This is just a simple implementation.  It could be a lot more complex
 depending on filetype etc.  For example, tcl has "" as quoted strings, but

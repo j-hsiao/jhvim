@@ -1,29 +1,45 @@
 let s:pairs = [{}, {}]
 
-
-for [s:k,s:v] in items(s:pairs[0])
-	let s:pairs[1][s:v] = s:k
-endfor
-
-
 function jhv#autopair#Add(c1, c2, ...)
-	if a:0
-		let flags = a:1
-	else
-		let flags = ''
-	endif
-	let s:pairs[0][a:c1] = [a:c2, flags]
+	let s:pairs[0][a:c1] = [a:c2]
 	let s:pairs[1][a:c2] = a:c1
+	let flags = a:0 ? a:000 : ['']
+	let flagdict = {}
+	let forced = v:false
+	for flag in flags
+		let parts = split(flag, '=', v:true)
+		if len(parts) == 1
+			let parts = ['', parts[0]]
+		endif
+		let [ftypes, flagstr] = parts
+		let flaglist = []
+		for item in 'brWc'
+			call add(flaglist, flagstr =~ item)
+		endfor
+		if flagstr =~ 'f'
+			let forced = v:true
+		endif
+		for ft in split(ftypes, ',', v:true)
+			let flagdict[ft] = flaglist
+		endfor
+	endfor
+	call add(s:pairs[0][a:c1], flagdict)
 
 	let pat = 'inoremap <expr> <silent> <special> %s jhv#autopair#Insert(%s)'
-	let items = [a:c1]
 	if a:c2 != a:c1
-		call add(items, a:c2)
+		let items = [a:c1, a:c2]
+	else
+		let items = [a:c1]
 	endif
 	for item in items
 		let lhs = substitute(item, '<', '<lt>', 'g')
 		let rhs = substitute(string(item), '<', '<lt>', 'g')
-		call jhv#mappings#ExtendMap(printf(pat, lhs, rhs))
+		let cmd = printf(pat, lhs, rhs)
+		if forced
+			exe cmd
+		else
+			call jhv#mappings#ExtendMap(cmd)
+		endif
 	endfor
 endfunction
 
@@ -33,44 +49,53 @@ function jhv#autopair#Insert(c)
 	else
 		let opening = s:pairs[1][a:c]
 	endif
-	let [closing, flags] = s:pairs[0][opening]
+	let [closing, flagd] = s:pairs[0][opening]
+	let [bflag, rflag, Wflag, cflag] = get(flagd, &l:ft, flagd[''])
 
 	let curtxt = getline('.')
 	let curidx = col('.')-1
 	let pre = strpart(curtxt, 0, curidx)
 	let post = strpart(curtxt, curidx)
-	echom [pre, post, a:c, opening, closing]
 
-	if opening == closing
-		" TODO determine whether opening or closing...
+	if cflag
+		let closepair = 1
+	elseif opening == closing
+		let closepair = post[:0] == closing
 	else
-		let opened = (a:c == opening)
+		let closepair = a:c == closing
 	endif
 
-	if opened
-		let parts = []
-		let bchar = ''
-		if flags =~ '.*r.*'
-			let bslash = match(pre, '\m\\*$')
-			if bslash >= 0
-				if (len(pre) - bslash) % 2
-					let bchar = '\'
+	if closepair
+		if post[:0] == closing
+			if bflag
+				let bslash = match(pre, '\m\\*$')
+				if bslash >= 0 && (len(pre) - bslash) % 2
+					return closing
 				endif
 			endif
-		endif
-		return join([
-			\ opening, bchar, closing,
-			\ repeat("\<C-G>U\<Left>", len(closing) + len(bchar))], '')
-	else
-		if post[:0] == closing
 			return "\<C-G>U\<Right>"
 		else
 			return a:c
 		endif
+	else
+		if Wflag
+			if post[:0] =~ '\m\w'
+				return opening
+			endif
+		endif
+		let parts = [opening, closing]
+		let extra = 0
+		if rflag
+			let bslash = match(pre, '\m\\*$')
+			if bslash >= 0 && (len(pre) - bslash) % 2
+				let parts = [opening, '\', closing]
+				let extra = 1
+			endif
+		endif
+		call add(parts, repeat("\<C-G>U\<Left>", len(closing) + extra))
+		return join(parts, '')
 	endif
 endfunction
-
-
 
 function jhv#autopair#PrepRemove()
 	"Prep for removal to see what was deleted
