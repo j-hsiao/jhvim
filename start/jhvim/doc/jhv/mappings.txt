@@ -30,6 +30,7 @@ command.  If the map does not already exist, it will be created.
 
 Settings~
 	before: bool=v:false, the new {rhs} should go before the original.
+	keep: bool=v:false, Keep the lhs if no prior mapping.
 	name: a name, defaults to {lhs}
 	rep: bool=v:true, Handle |:Repeatable| mappings.
 	SID: pass |expand(|'<SID>') to allow use of <SID> in {rhs}.

@@ -208,9 +208,10 @@ function jhv#mappings#CopyMap(mode, lhs, newlhs, ...)
 endfunction
 
 function jhv#mappings#ExtendMap(...)
-	let settingnames = ['before', 'name', 'SID', 'verbose', 'rep']
+	let settingnames = ['before', 'keep', 'name', 'SID', 'verbose', 'rep']
 	let [settings, mapcmd] = call('jhv#parse#Settings', extend([settingnames], a:000))
 	let before = get(settings, 'before', v:false)
+	let keep = get(settings, 'keep', v:false)
 	let name = get(settings, 'name', '')
 	let SID = get(settings, 'SID', '<SID>')
 	let verbose = get(settings, 'verbose', v:false)
@@ -249,7 +250,17 @@ function jhv#mappings#ExtendMap(...)
 	endif
 	execute printf('%s%smap %s %s %s', mapmode, mapnore, mapargs, plugname, rhs)
 	if empty(mapdict)
-		execute printf('%smap <special> %s %s', mapmode, lhs, plugname)
+		if keep
+			let oname = s:ExtendName(name, mapmode)
+			execute printf('%snoremap <special> %s %s', mapmode, oname, lhs)
+			if before
+				execute printf('%smap <special> %s %s%s', mapmode, lhs, plugname, oname)
+			else
+				execute printf('%smap <special> %s %s%s', mapmode, lhs, oname, plugname)
+			endif
+		else
+			execute printf('%smap <special> %s %s', mapmode, lhs, plugname)
+		endif
 	elseif mapdict['noremap']
 		let oname = s:ExtendName(name, mapmode)
 		if verbose
