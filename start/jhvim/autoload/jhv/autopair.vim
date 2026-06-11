@@ -23,6 +23,9 @@ function jhv#autopair#Add(c1, c2, ...)
 			let flagdict[ft] = flaglist
 		endfor
 	endfor
+	if ! has_key(flagdict, '')
+		let flagdict[''] = repeat([v:false], len(values(flagdict)[0]))
+	endif
 	call add(s:pairs[0][a:c1], flagdict)
 
 	let pat = 'inoremap <expr> <silent> <special> %s jhv#autopair#Insert(%s)'
@@ -102,9 +105,49 @@ function jhv#autopair#PrepRemove()
 	let b:jhv_autopair_removed = strpart(getline('.'), 0, col('.')-1)
 endfunction
 
-function jhv#autopair#Remove()
-	let cur = strpart(getline('.'), 0, col('.')-1)
-	let b:jhv_autopair_removed
-	" TODO search through removed to text to remove closing pair if
-	" applicable.
+function jhv#autopair#RemoveLeft()
+	let previous = b:jhv_autopair_removed
+	let curline = getline('.')
+	let curidx = col('.')-1
+	let removed = strpart(previous, curidx, len(previous) - len(curline))
+	let after = strpart(curline, curidx)
+	let lidx = len(removed)
+	let ridx = 0
+	let extra = []
+	while lidx
+		lidx -= 1
+		if has_key(s:pairs[0], removed[lidx])
+			let [closing, flagd] = s:pairs[0][removed[lidx]]
+			let [bflag, rflag, Wflag, cflag] = get(flagd, &l:ft, flagd[''])
+			if empty(extra)
+				# remove from after
+				if cflag
+				elseif bflag
+				elseif rflag
+				endif
+			else
+				if removed[lidx-(len(extra[-1])-1):lidx] == extra[-1]
+					let lidx -= (len(extra[-1])-1)
+					call remove(extra, -1)
+				endif
+			endif
+		elseif has_key(s:pairs[1], removed[lidx])
+			let opening = s:pairs[1][removed[lidx]]
+			let [closing, flagd] = s:pairs[0][opening]
+			let [bflag, rflag, Wflag, cflag] = get(flagd, &l:ft, flagd[''])
+			if cflag
+				continue
+			elseif bflag
+				"if ! escaped
+				"	add opening to extra
+				"endif
+			elseif rflag
+				"if escaped
+				"	add bslash opening to extra
+				"else
+				"	add opening to extra
+				"endif
+			endif
+		endif
+	endwhile
 endfunction
