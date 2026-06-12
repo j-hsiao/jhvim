@@ -1,42 +1,98 @@
+" {opening: [closing, {ft: [ipats, rpats]}]}
+" {closing: opening}
+"
+" ipats: [[prepat, postpat, insertion], ...]
+"   For each item in insertpats if prepat and postpat match, use insertion
+"   Otherwise, use c1 . c2
+" rpats: list of [prepat, postpat]  If both patterns match, then remove
+"   the matched group1 of each pattern.
+
 let s:pairs = [{}, {}]
+let s:rmpattern = '\m^.*$'
+
+let s:ipats = {}
+
+let s:StepRight = "\<C-G>U\<Right>"
+let s:StepLeft = "\<C-G>U\<Left>"
 
 function jhv#autopair#Add(c1, c2, ...)
-	let s:pairs[0][a:c1] = [a:c2]
-	let s:pairs[1][a:c2] = a:c1
+	let s:rmpattern = ''
+	let s:ipats[a:c1] = {}
+	if a:c2 != a:c1
+		let s:ipats[a:c2] = {}
+	endif
+
 	let flags = a:0 ? a:000 : ['']
-	let flagdict = {}
+	let hasdefault = v:false
 	let forced = v:false
+	let iodict = {}
+	let icdict = a:c1 == a:c2 ? iodict : {}
 	for flag in flags
 		let parts = split(flag, '=', v:true)
 		if len(parts) == 1
 			let parts = ['', parts[0]]
+		elseif len(parts) != 2
+			throw 'Invalid flags: ' . flag
 		endif
 		let [ftypes, flagstr] = parts
 		let flaglist = []
-		for item in 'brWc'
+		for item in 'brW'
 			call add(flaglist, flagstr =~ item)
 		endfor
 		if flagstr =~ 'f'
 			let forced = v:true
 		endif
+		let [bflag, rflag, Wflag] = flaglist
+		let iopats = []
+		let icpats = a:c1 == a:c2 ? iopats : []
+		if bflag && rflag
+			throw 'Error: bflag and rflag are mutually exclusive.'
+		endif
+		if bflag
+			call add(iopats, ['\m\%(^\|[^\\]\)\%(\\\\\)*\\$', '', a:c1])
+		elseif rflag
+			call add(iopats, ['\m\%(^\|[^\\]\)\%(\\\\\)*\\$', '',
+				\ join([a:c1, '\', a:c2, repeat(s:StepLeft, 1 + len(a:c2))], '')])
+			if !has_key(s:ipats, '\')
+				let s:ipats['\'] = {}
+				call jhv#mappings#ExtendMap(
+					\ 'inoremap <expr> <silent> <special> <Bslash> jhv#autopair#Insert(''<Bslash>'')')
+			endif
+		endif
+		if Wflag
+			call add(iopats, ['', '\m^\w', a:c1])
+			call add(iopats, ['\m\w$', printf('\m^[^%s]\|^$', escape(a:c1, '^]-\')), a:c1])
+		endif
+		call add(icpats, ['', '\V' . escape(a:c2, '\/'), s:StepRight])
+		call add(iopats, ['', '', a:c1 . a:c2 . repeat(s:StepLeft, len(a:c2))])
+		if a:c1 != a:c2
+			call add(icpats, ['', '', a:c2])
+		endif
 		for ft in split(ftypes, ',', v:true)
-			let flagdict[ft] = flaglist
+			let iodict[ft] = iopats
+			let icdict[ft] = icpats
+			if rflag
+				if !has_key(s:ipats['\'], ft)
+					let s:ipats['\'][ft] = [
+						\ ['', '\m^\\', s:StepRight],
+						\ ['', '', '\']
+					\]
+				endif
+			endif
 		endfor
 	endfor
-	if ! has_key(flagdict, '')
-		let flagdict[''] = repeat([v:false], len(values(flagdict)[0]))
-	endif
-	call add(s:pairs[0][a:c1], flagdict)
 
+	let s:ipats[a:c1] = iodict
 	let pat = 'inoremap <expr> <silent> <special> %s jhv#autopair#Insert(%s)'
 	if a:c2 != a:c1
+		let s:ipats[a:c2] = icdict
 		let items = [a:c1, a:c2]
 	else
 		let items = [a:c1]
 	endif
 	for item in items
-		let lhs = substitute(item, '<', '<lt>', 'g')
-		let rhs = substitute(string(item), '<', '<lt>', 'g')
+		let lhs = substitute(substitute(item, '<', '<lt>', 'g'), '\\', '<Bslash>', 'g')
+		let rhs = substitute(substitute(string(item), '<', '<lt>', 'g'), '\\', '<Bslash>', 'g')
 		let cmd = printf(pat, lhs, rhs)
 		if forced
 			exe cmd
@@ -46,72 +102,33 @@ function jhv#autopair#Add(c1, c2, ...)
 	endfor
 endfunction
 
-function s:RegexEndsWith(c, ...)
-	"Return a regex to check if a string ends with c enforcing escaped state.
-	"optional arg:
-	"  escaped=false: whether the char must be escaped or not.
-	if a:0 ? a:1 : v:false
-		return printf('\m\%%(^\|[^\\]\)\%%(\\\\\)*\(\\\V%s\m\)$', escape(a:c, '\/'))
-	else
-		return printf('\m\%%(^\|[^\\]\)\%%(\\\\\)*\(\V%s\m\)$', escape(a:c, '\/'))
-	endif
-endfunction
 
 function jhv#autopair#Insert(c)
-	if has_key(s:pairs[0], a:c)
-		let opening = a:c
-	else
-		let opening = s:pairs[1][a:c]
-	endif
-	let [closing, flagd] = s:pairs[0][opening]
-	let [bflag, rflag, Wflag, cflag] = get(flagd, &l:ft, flagd[''])
-
+	let ftpats = s:ipats[a:c]
 	let curtxt = getline('.')
 	let curidx = col('.')-1
 	let pre = strpart(curtxt, 0, curidx)
 	let post = strpart(curtxt, curidx)
-
-	if cflag
-		let closepair = 1
-	elseif opening == closing
-		let closepair = post[:0] == closing
-	else
-		let closepair = a:c == closing
-	endif
-
-	if closepair
-		if post[:0] == closing
-			if bflag
-				let bslash = match(pre, '\m\\*$')
-				if bslash >= 0 && (len(pre) - bslash) % 2
-					return closing
-				endif
-			endif
-			return "\<C-G>U\<Right>"
-		else
-			return a:c
+	for [prepat, postpat, insertion] in get(ftpats, &l:ft, get(ftpats, '', []))
+		if match(pre, prepat)>=0 && match(post, postpat)>=0
+			return insertion
 		endif
-	else
-		if Wflag
-			if post[:0] =~ '\m\w'
-				return opening
-			endif
-		endif
-		let parts = [opening, closing]
-		let extra = 0
-		if rflag
-			let bslash = match(pre, '\m\\*$')
-			if bslash >= 0 && (len(pre) - bslash) % 2
-				let parts = [opening, '\', closing]
-				let extra = 1
-			endif
-		endif
-		call add(parts, repeat("\<C-G>U\<Left>", len(closing) + extra))
-		return join(parts, '')
-	endif
+	endfor
+	return a:c
 endfunction
 
 
+function s:RMPattern()
+	if empty(s:rmpattern)
+		let characters = []
+		for chs in items(s:pairs[1])
+			call extend(characters, chs)
+		endfor
+		let pairs = escape(join(characters, ''), '^]-\')
+		let s:rmpattern = printf('\m\([%s]\)[^%s]*$', pairs, pairs)
+	endif
+	return s:rmpattern
+endfunction
 function jhv#autopair#PrepRemove()
 	"Prep for removal to see what was deleted
 	let b:jhv_autopair_removed = strpart(getline('.'), 0, col('.')-1)
@@ -125,6 +142,13 @@ function jhv#autopair#RemoveLeft()
 	let lidx = len(removed)
 	let ridx = 0
 	let extra = []
+
+	let rmpat = s:RMPattern()
+	let removal = matchlist(strpart(removed, lidx))
+	while not empty(removal)
+
+	endwhile
+
 	while lidx
 		lidx -= 1
 		if has_key(s:pairs[0], removed[lidx])
