@@ -4,19 +4,49 @@
 " ipats: [[prepat, postpat, insertion], ...]
 "   For each item in insertpats if prepat and postpat match, use insertion
 "   Otherwise, use c1 . c2
-" rpats: list of [prepat, postpat]  If both patterns match, then remove
+" rpats: [[prepat, postpat], ...]  If both patterns match, then remove
 "   the matched group1 of each pattern.
 
 let s:pairs = [{}, {}]
-let s:rmpattern = '\m^.*$'
+let s:rmskip = '\m^.*$'
 
 let s:ipats = {}
 
 let s:StepRight = "\<C-G>U\<Right>"
 let s:StepLeft = "\<C-G>U\<Left>"
 
+function s:CalcIpats(c1, c2, flaglist)
+	let [bflag, rflag, Wflag] = a:flaglist
+	let iopats = []
+	let icpats = a:c1 == a:c2 ? iopats : []
+	if bflag && rflag
+		throw 'Error: bflag and rflag are mutually exclusive.'
+	endif
+	if bflag
+		call add(iopats, ['\m\%(^\|[^\\]\)\%(\\\\\)*\\$', '', a:c1])
+	elseif rflag
+		call add(iopats, ['\m\%(^\|[^\\]\)\%(\\\\\)*\\$', '',
+			\ join([a:c1, '\', a:c2, repeat(s:StepLeft, 1 + len(a:c2))], '')])
+		if !has_key(s:ipats, '\')
+			let s:ipats['\'] = {}
+			call jhv#mappings#ExtendMap(
+				\ 'inoremap <expr> <silent> <special> <Bslash> jhv#autopair#Insert(''<Bslash>'')')
+		endif
+	endif
+	if Wflag
+		call add(iopats, ['', '\m^\w', a:c1])
+		call add(iopats, ['\m\w$', printf('\m^[^%s]\|^$', escape(a:c1, '^]-\')), a:c1])
+	endif
+	call add(icpats, ['', '\V' . escape(a:c2, '\/'), s:StepRight])
+	call add(iopats, ['', '', a:c1 . a:c2 . repeat(s:StepLeft, len(a:c2))])
+	if a:c1 != a:c2
+		call add(icpats, ['', '', a:c2])
+	endif
+	return [iopats, icpats]
+endfunction
+
 function jhv#autopair#Add(c1, c2, ...)
-	let s:rmpattern = ''
+	let s:rmskip = ''
 	let s:ipats[a:c1] = {}
 	if a:c2 != a:c1
 		let s:ipats[a:c2] = {}
@@ -42,36 +72,11 @@ function jhv#autopair#Add(c1, c2, ...)
 		if flagstr =~ 'f'
 			let forced = v:true
 		endif
-		let [bflag, rflag, Wflag] = flaglist
-		let iopats = []
-		let icpats = a:c1 == a:c2 ? iopats : []
-		if bflag && rflag
-			throw 'Error: bflag and rflag are mutually exclusive.'
-		endif
-		if bflag
-			call add(iopats, ['\m\%(^\|[^\\]\)\%(\\\\\)*\\$', '', a:c1])
-		elseif rflag
-			call add(iopats, ['\m\%(^\|[^\\]\)\%(\\\\\)*\\$', '',
-				\ join([a:c1, '\', a:c2, repeat(s:StepLeft, 1 + len(a:c2))], '')])
-			if !has_key(s:ipats, '\')
-				let s:ipats['\'] = {}
-				call jhv#mappings#ExtendMap(
-					\ 'inoremap <expr> <silent> <special> <Bslash> jhv#autopair#Insert(''<Bslash>'')')
-			endif
-		endif
-		if Wflag
-			call add(iopats, ['', '\m^\w', a:c1])
-			call add(iopats, ['\m\w$', printf('\m^[^%s]\|^$', escape(a:c1, '^]-\')), a:c1])
-		endif
-		call add(icpats, ['', '\V' . escape(a:c2, '\/'), s:StepRight])
-		call add(iopats, ['', '', a:c1 . a:c2 . repeat(s:StepLeft, len(a:c2))])
-		if a:c1 != a:c2
-			call add(icpats, ['', '', a:c2])
-		endif
+		let [iopats, icpats] = s:CalcIpats(a:c1, a:c2, flaglist)
 		for ft in split(ftypes, ',', v:true)
 			let iodict[ft] = iopats
 			let icdict[ft] = icpats
-			if rflag
+			if flaglist[1]
 				if !has_key(s:ipats['\'], ft)
 					let s:ipats['\'][ft] = [
 						\ ['', '\m^\\', s:StepRight],
@@ -118,16 +123,16 @@ function jhv#autopair#Insert(c)
 endfunction
 
 
-function s:RMPattern()
-	if empty(s:rmpattern)
+function s:RmSkip()
+	if empty(s:rmskip)
 		let characters = []
 		for chs in items(s:pairs[1])
 			call extend(characters, chs)
 		endfor
 		let pairs = escape(join(characters, ''), '^]-\')
-		let s:rmpattern = printf('\m\([%s]\)[^%s]*$', pairs, pairs)
+		let s:rmskip = printf('\m\([%s]\)[^%s]*$', pairs, pairs)
 	endif
-	return s:rmpattern
+	return s:rmskip
 endfunction
 function jhv#autopair#PrepRemove()
 	"Prep for removal to see what was deleted
@@ -143,10 +148,14 @@ function jhv#autopair#RemoveLeft()
 	let ridx = 0
 	let extra = []
 
-	let rmpat = s:RMPattern()
+	let rmpat = s:RmSkip()
 	let removal = matchlist(strpart(removed, lidx))
-	while not empty(removal)
+	while not empty(get(removal, 1, ''))
+		let lidx -= len(removal[0]) - 1
+		for [prepat, postpat] in s:rpats[removal[1]]
 
+		endfor
+		let removal = matchlist(strpart(removed, lidx))
 	endwhile
 
 	while lidx
