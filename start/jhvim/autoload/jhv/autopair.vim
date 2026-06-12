@@ -46,6 +46,17 @@ function jhv#autopair#Add(c1, c2, ...)
 	endfor
 endfunction
 
+function s:RegexEndsWith(c, ...)
+	"Return a regex to check if a string ends with c enforcing escaped state.
+	"optional arg:
+	"  escaped=false: whether the char must be escaped or not.
+	if a:0 ? a:1 : v:false
+		return printf('\m\%%(^\|[^\\]\)\%%(\\\\\)*\(\\\V%s\m\)$', escape(a:c, '\/'))
+	else
+		return printf('\m\%%(^\|[^\\]\)\%%(\\\\\)*\(\V%s\m\)$', escape(a:c, '\/'))
+	endif
+endfunction
+
 function jhv#autopair#Insert(c)
 	if has_key(s:pairs[0], a:c)
 		let opening = a:c
@@ -100,11 +111,11 @@ function jhv#autopair#Insert(c)
 	endif
 endfunction
 
+
 function jhv#autopair#PrepRemove()
 	"Prep for removal to see what was deleted
 	let b:jhv_autopair_removed = strpart(getline('.'), 0, col('.')-1)
 endfunction
-
 function jhv#autopair#RemoveLeft()
 	let previous = b:jhv_autopair_removed
 	let curline = getline('.')
@@ -126,8 +137,9 @@ function jhv#autopair#RemoveLeft()
 				elseif rflag
 				endif
 			else
-				if removed[lidx-(len(extra[-1])-1):lidx] == extra[-1]
-					let lidx -= (len(extra[-1])-1)
+				let matched = matchlist(removed[:lidx], extra[-1])
+				if len(get(matched, 1, ''))
+					let lidx -= len(matched[1]) - 1
 					call remove(extra, -1)
 				endif
 			endif
@@ -138,9 +150,12 @@ function jhv#autopair#RemoveLeft()
 			if cflag
 				continue
 			elseif bflag
-				"if ! escaped
-				"	add opening to extra
-				"endif
+				if removed[:lidx] =~ '\m\%(^\|[^\\]\)\(\\\\\|\\%s$\)*$'
+
+				call add(extra, )
+				if ! escaped
+					add opening to extra
+				endif
 			elseif rflag
 				"if escaped
 				"	add bslash opening to extra
@@ -151,3 +166,5 @@ function jhv#autopair#RemoveLeft()
 		endif
 	endwhile
 endfunction
+
+
