@@ -9,12 +9,19 @@ c2.  The effect is that typing is as normal, but the character pairs are
 maintained if typing is cancelled.  This is just a minor convenience for
 example, to keep parentheses closed when many nested parentheses are involved.
 
+When backspacing over an opening char, if followed by a corresponding closing
+char, it will also be deleted.
+
 Default added pairs are: [], {}, (), '', ""
 
 Flags are strings of the form [filetype,...]=flags
 flags can be divided into opening (c1) and closing (c2).
 opening flags:
-  'W': Only Add pair if preceded by non-word character (or nothing)
+  'W': Only add pair if preceded by non-word character or nothing.
+       By default, pair is only added when followed by non-word or nothing.
+       If the next character is a word character, then it is very likely
+       that the intent is to wrap it in the pair.  In that case, adding
+       the pair would just be a nuisance.
   'r': This is a regex-like item.  If preceded by a backslash, also add
        a backslash to the closing item. For example: '\(\)'
 closing flags:
