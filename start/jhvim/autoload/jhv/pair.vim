@@ -46,6 +46,19 @@ function s:CalcIpats(c1, c2, flaglist)
 	return [iopats, icpats]
 endfunction
 
+function s:CalcRpats(c1, c2, flaglist)
+	"Calculate removal patterns
+	let [bflag, rflag] = a:flaglist
+	let ropats = []
+	let rcpats = []
+	if bflag
+		call add(ropats, [printf('\%%(^\|[^\\]\)\%%(\\\\\\)*\(\\\V%s\m\)', escape(a:c1, '\/')), ''])
+	elseif rflag
+		call add(ropats, [printf('\%%(^\|[^\\]\)\%%(\\\\\\)*\(\\\V%s\m\)', escape(a:c1, '\/')), ''])
+	endif
+
+endfunction
+
 function jhv#pair#Add(c1, c2, ...)
 	let s:ipats[a:c1] = {}
 	if a:c2 != a:c1
@@ -139,18 +152,18 @@ endfunction
 function jhv#pair#RemoveLeft()
 	let previous = b:jhv_pair_pre_remove
 	let curline = getline('.')
-	let curidx = col('.')-1
-	let before = strpart(previous, 0, curidx + (len(previous) - len(curline)))
-	let after = strpart(curline, curidx)
+	let startidx = col('.')-1
+	let before = strpart(previous, 0, startidx + (len(previous) - len(curline)))
+	let after = strpart(curline, startidx)
 	let lidx = len(before)
 	let ridx = 0
 	let softstack = []
-	while lidx > curidx
+	while lidx > startidx
 		let lidx -= 1
 		if has_key(s:rpats[0], before[lidx])
-			let before = before[:lidx]
+			let before = strpart(before, 0, lidx)
 			for [lreg, target] in s:rpats[0][before[lidx]]
-				let lmatch = matchlist(before, lreg)
+				let lmatch = matchlist(before, lreg, startidx)
 				if !empty(lmatch)
 					let sidx = len(softstack) - 1
 					while sidx >= 0
@@ -171,8 +184,9 @@ function jhv#pair#RemoveLeft()
 					endif
 				endif
 			endfor
-		elseif has_key(s:rpats[1], before[lidx])
-			let before = before[:lidx]
+		endif
+		if has_key(s:rpats[1], before[lidx])
+			let before = strpart(before, 0, lidx)
 			for pat in s:rpats[1][before[lidx]]
 				let lmatch = matchlist(before, pat)
 				if !empty(lmatch)
