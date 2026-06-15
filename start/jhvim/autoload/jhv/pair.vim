@@ -29,7 +29,7 @@ endfunction
 
 function s:CalcIpats(c1, c2, flaglist)
 	" Calculate insertion pattern for open/close
-	let [bflag, rflag] = a:flaglist
+	let [bflag, rflag, Wflag] = a:flaglist
 	let iopats = []
 	let icpats = a:c1 == a:c2 ? iopats : []
 	if bflag && rflag
@@ -46,17 +46,18 @@ function s:CalcIpats(c1, c2, flaglist)
 				\ 'inoremap <expr> <silent> <special> <Bslash> jhv#pair#Insert(''<Bslash>'')')
 		endif
 	endif
-	call add(icpats, ['', '\V' . escape(a:c2, '\/'), s:StepRight])
-	call add(iopats, ['', '', a:c1 . a:c2 . repeat(s:StepLeft, len(a:c2))])
-	if a:c1 != a:c2
-		call add(icpats, ['', '', a:c2])
+	call add(icpats, ['', '\m^\V' . escape(a:c2, '\/'), s:StepRight])
+	if Wflag
+		call add(iopats, ['\m^$\|\W$', '\m^$\|^\W', a:c1 . a:c2 . repeat(s:StepLeft, len(a:c2))])
+	else
+		call add(iopats, ['', '\m^$\|^\W', a:c1 . a:c2 . repeat(s:StepLeft, len(a:c2))])
 	endif
 	return [iopats, icpats]
 endfunction
 
 function s:CalcRpats(c1, c2, flaglist)
 	"Calculate removal patterns
-	let [bflag, rflag] = a:flaglist
+	let [bflag, rflag, Wflag] = a:flaglist
 	let ropats = []
 	let rcpats = []
 	if bflag
@@ -93,7 +94,7 @@ function jhv#pair#Add(c1, c2, ...)
 		endif
 		let [ftypes, flagstr] = parts
 		let flaglist = []
-		for item in 'br'
+		for item in 'brW'
 			call add(flaglist, flagstr =~ item)
 		endfor
 		if flagstr =~ 'f'

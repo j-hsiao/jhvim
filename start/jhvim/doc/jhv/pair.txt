@@ -14,6 +14,7 @@ Default added pairs are: [], {}, (), '', ""
 Flags are strings of the form [filetype,...]=flags
 flags can be divided into opening (c1) and closing (c2).
 opening flags:
+  'W': Only Add pair if preceded by non-word character (or nothing)
   'r': This is a regex-like item.  If preceded by a backslash, also add
        a backslash to the closing item. For example: '\(\)'
 closing flags:
