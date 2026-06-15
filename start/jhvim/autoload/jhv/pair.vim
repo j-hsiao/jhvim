@@ -8,6 +8,7 @@
 "   the matched group1 of each pattern.
 
 let s:pairs = [{}, {}]
+"Skip regex to find the next close/open for processing.
 let s:rmskip = '\m^.*$'
 
 let s:ipats = {}
@@ -16,7 +17,8 @@ let s:StepRight = "\<C-G>U\<Right>"
 let s:StepLeft = "\<C-G>U\<Left>"
 
 function s:CalcIpats(c1, c2, flaglist)
-	let [bflag, rflag, Wflag] = a:flaglist
+	" Calculate insertion pattern for open/close
+	let [bflag, rflag] = a:flaglist
 	let iopats = []
 	let icpats = a:c1 == a:c2 ? iopats : []
 	if bflag && rflag
@@ -30,12 +32,8 @@ function s:CalcIpats(c1, c2, flaglist)
 		if !has_key(s:ipats, '\')
 			let s:ipats['\'] = {}
 			call jhv#mappings#ExtendMap(
-				\ 'inoremap <expr> <silent> <special> <Bslash> jhv#autopair#Insert(''<Bslash>'')')
+				\ 'inoremap <expr> <silent> <special> <Bslash> jhv#pair#Insert(''<Bslash>'')')
 		endif
-	endif
-	if Wflag
-		call add(iopats, ['', '\m^\w', a:c1])
-		call add(iopats, ['\m\w$', printf('\m^[^%s]\|^$', escape(a:c1, '^]-\')), a:c1])
 	endif
 	call add(icpats, ['', '\V' . escape(a:c2, '\/'), s:StepRight])
 	call add(iopats, ['', '', a:c1 . a:c2 . repeat(s:StepLeft, len(a:c2))])
@@ -45,7 +43,7 @@ function s:CalcIpats(c1, c2, flaglist)
 	return [iopats, icpats]
 endfunction
 
-function jhv#autopair#Add(c1, c2, ...)
+function jhv#pair#Add(c1, c2, ...)
 	let s:rmskip = ''
 	let s:ipats[a:c1] = {}
 	if a:c2 != a:c1
@@ -88,7 +86,7 @@ function jhv#autopair#Add(c1, c2, ...)
 	endfor
 
 	let s:ipats[a:c1] = iodict
-	let pat = 'inoremap <expr> <silent> <special> %s jhv#autopair#Insert(%s)'
+	let pat = 'inoremap <expr> <silent> <special> %s jhv#pair#Insert(%s)'
 	if a:c2 != a:c1
 		let s:ipats[a:c2] = icdict
 		let items = [a:c1, a:c2]
@@ -108,7 +106,7 @@ function jhv#autopair#Add(c1, c2, ...)
 endfunction
 
 
-function jhv#autopair#Insert(c)
+function jhv#pair#Insert(c)
 	let ftpats = s:ipats[a:c]
 	let curtxt = getline('.')
 	let curidx = col('.')-1
@@ -134,12 +132,12 @@ function s:RmSkip()
 	endif
 	return s:rmskip
 endfunction
-function jhv#autopair#PrepRemove()
+function jhv#pair#PrepRemove()
 	"Prep for removal to see what was deleted
-	let b:jhv_autopair_removed = strpart(getline('.'), 0, col('.')-1)
+	let b:jhv_pair_removed = strpart(getline('.'), 0, col('.')-1)
 endfunction
-function jhv#autopair#RemoveLeft()
-	let previous = b:jhv_autopair_removed
+function jhv#pair#RemoveLeft()
+	let previous = b:jhv_pair_removed
 	let curline = getline('.')
 	let curidx = col('.')-1
 	let removed = strpart(previous, curidx, len(previous) - len(curline))
@@ -162,7 +160,7 @@ function jhv#autopair#RemoveLeft()
 		lidx -= 1
 		if has_key(s:pairs[0], removed[lidx])
 			let [closing, flagd] = s:pairs[0][removed[lidx]]
-			let [bflag, rflag, Wflag, cflag] = get(flagd, &l:ft, flagd[''])
+			let [bflag, rflag] = get(flagd, &l:ft, flagd[''])
 			if empty(extra)
 				# remove from after
 				if cflag
@@ -179,7 +177,7 @@ function jhv#autopair#RemoveLeft()
 		elseif has_key(s:pairs[1], removed[lidx])
 			let opening = s:pairs[1][removed[lidx]]
 			let [closing, flagd] = s:pairs[0][opening]
-			let [bflag, rflag, Wflag, cflag] = get(flagd, &l:ft, flagd[''])
+			let [bflag, rflag] = get(flagd, &l:ft, flagd[''])
 			if cflag
 				continue
 			elseif bflag
