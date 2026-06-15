@@ -7,11 +7,14 @@
 " rpats: [[prepat, postpat], ...]  If both patterns match, then remove
 "   the matched group1 of each pattern.
 
-let s:pairs = [{}, {}]
-"Skip regex to find the next close/open for processing.
-let s:rmskip = '\m^.*$'
-
+" ch: [[prepat, postpat, insertion]...]
 let s:ipats = {}
+
+"
+" och: [[prepat, target]] -> matched before and after respectively
+" cch: [pat, ...] -> stuff to remove...
+let s:rpats = [{}, {}]
+
 
 let s:StepRight = "\<C-G>U\<Right>"
 let s:StepLeft = "\<C-G>U\<Left>"
@@ -44,7 +47,6 @@ function s:CalcIpats(c1, c2, flaglist)
 endfunction
 
 function jhv#pair#Add(c1, c2, ...)
-	let s:rmskip = ''
 	let s:ipats[a:c1] = {}
 	if a:c2 != a:c1
 		let s:ipats[a:c2] = {}
@@ -64,7 +66,7 @@ function jhv#pair#Add(c1, c2, ...)
 		endif
 		let [ftypes, flagstr] = parts
 		let flaglist = []
-		for item in 'brW'
+		for item in 'br'
 			call add(flaglist, flagstr =~ item)
 		endfor
 		if flagstr =~ 'f'
@@ -76,10 +78,7 @@ function jhv#pair#Add(c1, c2, ...)
 			let icdict[ft] = icpats
 			if flaglist[1]
 				if !has_key(s:ipats['\'], ft)
-					let s:ipats['\'][ft] = [
-						\ ['', '\m^\\', s:StepRight],
-						\ ['', '', '\']
-					\]
+					let s:ipats['\'][ft] = [['', '\m^\\', s:StepRight]]
 				endif
 			endif
 		endfor
@@ -121,81 +120,67 @@ function jhv#pair#Insert(c)
 endfunction
 
 
-function s:RmSkip()
-	if empty(s:rmskip)
-		let characters = []
-		for chs in items(s:pairs[1])
-			call extend(characters, chs)
-		endfor
-		let pairs = escape(join(characters, ''), '^]-\')
-		let s:rmskip = printf('\m\([%s]\)[^%s]*$', pairs, pairs)
-	endif
-	return s:rmskip
-endfunction
 function jhv#pair#PrepRemove()
 	"Prep for removal to see what was deleted
-	let b:jhv_pair_removed = strpart(getline('.'), 0, col('.')-1)
+	let b:jhv_pair_pre_remove = strpart(getline('.'), 0, col('.')-1)
 endfunction
+
+"When removing...
+"()|)
+" From | to beginning, would expect a single ) remaining.
+" If don't detect closing chars, after 1 deletion, see (), so delete the )
+" afterwards aswell. which is undesired.  However, closing does not
+" necessarily mean an opening char exists:
+" example: ')|' -> would search for an opening ( which does not exist.
+" As a result, the () is never closed and the ending quote is never removed.
+" therefore... generate a soft-stack.  push closing char onto soft stack.
+" If opening char detected and matches end of soft stack, pop it.
+" Othewrise, compare with right string.  If removal, clear the stack too.
 function jhv#pair#RemoveLeft()
-	let previous = b:jhv_pair_removed
+	let previous = b:jhv_pair_pre_remove
 	let curline = getline('.')
 	let curidx = col('.')-1
-	let removed = strpart(previous, curidx, len(previous) - len(curline))
+	let before = strpart(previous, 0, curidx + (len(previous) - len(curline)))
 	let after = strpart(curline, curidx)
-	let lidx = len(removed)
+	let lidx = len(before)
 	let ridx = 0
-	let extra = []
-
-	let rmpat = s:RmSkip()
-	let removal = matchlist(strpart(removed, lidx))
-	while not empty(get(removal, 1, ''))
-		let lidx -= len(removal[0]) - 1
-		for [prepat, postpat] in s:rpats[removal[1]]
-
-		endfor
-		let removal = matchlist(strpart(removed, lidx))
-	endwhile
-
-	while lidx
-		lidx -= 1
-		if has_key(s:pairs[0], removed[lidx])
-			let [closing, flagd] = s:pairs[0][removed[lidx]]
-			let [bflag, rflag] = get(flagd, &l:ft, flagd[''])
-			if empty(extra)
-				# remove from after
-				if cflag
-				elseif bflag
-				elseif rflag
+	let softstack = []
+	while lidx > curidx
+		let lidx -= 1
+		if has_key(s:rpats[0], before[lidx])
+			let before = before[:lidx]
+			for [lreg, target] in s:rpats[0][before[lidx]]
+				let lmatch = matchlist(before, lreg)
+				if !empty(lmatch)
+					let sidx = len(softstack) - 1
+					while sidx >= 0
+						if softstack[sidx] == target
+							call remove(softstack, sidx, -1)
+							let lidx -= len(lmatch[1])-1
+							break
+						endif
+						let sidx -= 1
+					endwhile
+					if sidx >= 0
+						break
+					elseif after[ridx:ridx+(len(target)-1)] == target
+						let lidx -= len(lmatch[1])-1
+						let ridx += len(target)
+						call remove(softstack, 0, -1)
+						break
+					endif
 				endif
-			else
-				let matched = matchlist(removed[:lidx], extra[-1])
-				if len(get(matched, 1, ''))
-					let lidx -= len(matched[1]) - 1
-					call remove(extra, -1)
+			endfor
+		elseif has_key(s:rpats[1], before[lidx])
+			let before = before[:lidx]
+			for pat in s:rpats[1][before[lidx]]
+				let lmatch = matchlist(before, pat)
+				if !empty(lmatch)
+					call add(softstack, lmatch[1])
+					break
 				endif
-			endif
-		elseif has_key(s:pairs[1], removed[lidx])
-			let opening = s:pairs[1][removed[lidx]]
-			let [closing, flagd] = s:pairs[0][opening]
-			let [bflag, rflag] = get(flagd, &l:ft, flagd[''])
-			if cflag
-				continue
-			elseif bflag
-				if removed[:lidx] =~ '\m\%(^\|[^\\]\)\(\\\\\|\\%s$\)*$'
-
-				call add(extra, )
-				if ! escaped
-					add opening to extra
-				endif
-			elseif rflag
-				"if escaped
-				"	add bslash opening to extra
-				"else
-				"	add opening to extra
-				"endif
-			endif
+			endfor
 		endif
 	endwhile
+	return repeat("\<Del>", ridx)
 endfunction
-
-
