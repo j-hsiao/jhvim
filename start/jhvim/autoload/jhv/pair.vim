@@ -29,7 +29,7 @@ endfunction
 
 function s:CalcIpats(c1, c2, flaglist)
 	" Calculate insertion pattern for open/close
-	let [bflag, rflag, Wflag] = a:flaglist
+	let [bflag, rflag, Wflag, tflag] = a:flaglist
 	let iopats = []
 	let icpats = a:c1 == a:c2 ? iopats : []
 	if bflag && rflag
@@ -39,7 +39,7 @@ function s:CalcIpats(c1, c2, flaglist)
 		call add(iopats, ['\m\%(^\|[^\\]\)\%(\\\\\)*\\$', '', a:c1])
 	elseif rflag
 		call add(iopats, ['\m\%(^\|[^\\]\)\%(\\\\\)*\\$', '',
-			\ join([a:c1, '\', a:c2, repeat(s:StepLeft, 1 + len(a:c2))], '')])
+			\ join([a:c1, '\', a:c2, repeat(s:StepLeft, 2)], '')])
 		if !has_key(s:ipats, '\')
 			let s:ipats['\'] = {}
 			call jhv#mappings#ExtendMap(
@@ -47,6 +47,18 @@ function s:CalcIpats(c1, c2, flaglist)
 		endif
 	endif
 	call add(icpats, ['', '\m^\V' . escape(a:c2, '\/'), s:StepRight])
+	if tflag && a:c1 == a:c2
+		if Wflag
+			"Allows triple after a word-like
+			"example: r""""""
+			let insertion = repeat(a:c2, 3) . repeat(s:StepLeft, 3)
+			let prepat = printf('\V%s\$', repeat(escape(a:c1, '\/'), 3))
+			call add(icpats, [prepat, '\m^$\|^\W', insertion])
+		endif
+		let insertion = repeat(a:c2, 4) . repeat(s:StepLeft, 3)
+		let prepat = printf('\V%s\$', repeat(escape(a:c1, '\/'), 2))
+		call add(iopats, [prepat, '\m^$\|^\W', insertion])
+	endif
 	if Wflag
 		call add(iopats, ['\m^$\|\W$', '\m^$\|^\W', a:c1 . a:c2 . repeat(s:StepLeft, len(a:c2))])
 	else
@@ -57,7 +69,7 @@ endfunction
 
 function s:CalcRpats(c1, c2, flaglist)
 	"Calculate removal patterns
-	let [bflag, rflag, Wflag] = a:flaglist
+	let [bflag, rflag, Wflag, tflag] = a:flaglist
 	let ropats = []
 	let rcpats = []
 	if bflag
@@ -66,6 +78,20 @@ function s:CalcRpats(c1, c2, flaglist)
 		call add(ropats, ['\%(^\|[^\\]\)\%(\\\\\)*\(\\\)$', '\' . a:c2])
 		call add(rcpats, '\%(^\|[^\\]\)\%(\\\\\)*\(\\\)$')
 	endif
+	if tflag
+		let lpat = printf('\%%(^\|[^%s]\)\(\V%s\m\)',
+			\ escape(a:c1, '^-]\'), escape(repeat(a:c2, 2), '\/'))
+		call add(ropats, [lpat, repeat(a:c2, 3)])
+		let emptypair = printf('\V\(%s%s\)\$',
+			\ repeat(escape(a:c1, '\/'), 3),
+			\ repeat(escape(a:c2, '\/'), 2))
+		let fullpair = printf('\V%s\.\*\(%s\)\$',
+			\ repeat(escape(a:c1, '\/'), 3),
+			\ repeat(escape(a:c2, '\/'), 2))
+		call add(rcpats, emptypair)
+		call add(rcpats, fullpair)
+	endif
+	call add(rcpats, printf('\V\(%s\)\$', escape(a:c1, '\/')))
 	call add(rcpats, '')
 	call add(ropats, ['', a:c2])
 	return [ropats, rcpats]
@@ -94,7 +120,7 @@ function jhv#pair#Add(c1, c2, ...)
 		endif
 		let [ftypes, flagstr] = parts
 		let flaglist = []
-		for item in 'brW'
+		for item in 'brWt'
 			call add(flaglist, flagstr =~ item)
 		endfor
 		if flagstr =~ 'f'
@@ -169,6 +195,7 @@ function s:RemoveOpen(before, lidx, after, ridx, stack)
 					call remove(a:stack, sidx, -1)
 					return [len(lmatch[1]), 0]
 				endif
+				let sidx -= 1
 			endwhile
 			if strpart(a:after, a:ridx, len(target)) == target
 				if !empty(a:stack)

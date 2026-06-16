@@ -2,34 +2,48 @@
 
 							*jhv#pair#Add()*
 jhv#pair#Add(c1, c2[, flags...])
-Add a pair of characters to handle.  Whenever c1 is inserted, c2 is also
-automatically inserted after the current cursor position.  Whenever the
-cursor is on c2 and c2 is inserted, then step over c2 instead of inserting
-c2.  The effect is that typing is as normal, but the character pairs are
-maintained if typing is cancelled.  This is just a minor convenience for
-example, to keep parentheses closed when many nested parentheses are involved.
+Complete character pairs when the opening character is typed, but not when
+followed by '\w'. >
+  txt |  ->  txt (|)
+  func|  ->  func(|)
+  |txt   ->  (|txt
+When deleting, empty character pairs will be deleted: >
+  func(|) -> func|
+  func()| -> func|
+For multi-character deletions, a simple pairing will be performed. >
+  [this(is{stuff|})]
+<<C-U> will leave the line empty:
+  After "stuff" is removed, the {} are deleted together.
+  After "is" is removed, the () are deleted together.
+  And after "this" is removed, [] are deleted together.
 
-When backspacing over an opening char, if followed by a corresponding closing
-char, it will also be deleted.
+Default added pairs are: [], {}, (), '', "" and `` for markdown.
 
-Default added pairs are: [], {}, (), '', ""
-
+Flags~
 Flags are strings of the form [filetype,...]=flags
-flags can be divided into opening (c1) and closing (c2).
-opening flags:
-  'W': Only add pair if preceded by non-word character or nothing.
-       By default, pair is only added when followed by non-word or nothing.
-       If the next character is a word character, then it is very likely
-       that the intent is to wrap it in the pair.  In that case, adding
-       the pair would just be a nuisance.
-  'r': This is a regex-like item.  If preceded by a backslash, also add
-       a backslash to the closing item. For example: '\(\)'
-closing flags:
-  'b': Insert the item if preceeded by a backslash rather than step over.
-both:
-  'f': force map overwrite if already exist.  Otherwise |ExtendMap|
+'W': Do not complete the pair if preceded by a word
+'r': This is a regex-like item.  If preceded by a backslash, also add
+     a backslash to the closing item.
+     example: regex group \(\)
+       |
+       \|
+       \(|\)
+'t': Indicate the pair allows triple. ex. ```code block``` or '''python str'''
+     NOTE: This only applies if c1 and c2 are the same.  Otherwise, inserting
+     c1 3 times would automatically have c2 3 times after the cursor without
+     any extra handling.  Note this also allows usage after a word-like character
+     even if the W flag is given.
+     Example, raw python multiline string:
+       r|
+       r"|
+       r""|"
+       r"""|
+       r"""|"""
+'b': Insert the item if preceeded by a backslash rather than step over.
+'f': force map overwrite if already exist.  Otherwise |ExtendMap|
 
 NOTE: This is just a simple implementation.  It could be a lot more complex
 depending on filetype etc.  For example, tcl has "" as quoted strings, but
 also {}.  most languages have "" and '', and some allow backslash escapes
 within '' but others do not.
+

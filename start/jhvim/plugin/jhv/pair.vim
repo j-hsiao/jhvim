@@ -1,7 +1,8 @@
 " complete single quotes
 " backslash does NOT escape in bash, vim, sh
-call jhv#pair#Add("'", "'", 'fbW', 'bash,vim,sh=W')
-call jhv#pair#Add('"', '"', 'fbW')
+call jhv#pair#Add('`', '`', 'markdown=bWt')
+call jhv#pair#Add("'", "'", 'fbW', 'bash,vim,sh=W', 'python=bWt')
+call jhv#pair#Add('"', '"', 'fbW', 'python=bWt')
 call jhv#pair#Add('(', ')', 'fr')
 call jhv#pair#Add('[', ']', 'f')
 call jhv#pair#Add('{', '}', 'f')
