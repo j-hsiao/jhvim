@@ -7,6 +7,8 @@ let s:rpats = [{}, {}]
 let s:StepRight = "\<C-G>U\<Right>"
 let s:StepLeft = "\<C-G>U\<Left>"
 
+let jhv#pair#extend = get(g:, 'jhv#pair#extend', 1)
+
 function jhv#pair#Show()
 	echom 'ipats'
 	for [ch, ftd] in items(s:ipats)
@@ -105,27 +107,30 @@ function jhv#pair#Add(c1, c2, ...)
 
 	let flags = a:0 ? a:000 : ['']
 	let hasdefault = v:false
-	let forced = v:false
 	let iodict = {}
 	let icdict = a:c1 == a:c2 ? iodict : {}
 
 	let rodict = {}
 	let rcdict = {}
 	for flag in flags
-		let parts = split(flag, '=', v:true)
-		if len(parts) == 1
-			let parts = ['', parts[0]]
-		elseif len(parts) != 2
-			throw 'Invalid flags: ' . flag
+		let parts = matchlist(flag, '\m^\(\^\)\?\%(\([^=]*\)=\)\?\(.*\)$')
+		if empty(parts)
+			throw printf('Bad pair flag: %s', flag)
 		endif
-		let [ftypes, flagstr] = parts
+		let [exclude, ftypes, flagstr] = parts[1:3]
+		if !empty(exclude)
+			if empty(ftypes)
+				let ftypes = flagstr
+			endif
+			for ft in split(ftypes, ',', v:true)
+				let [iodict[ft], icdict[ft], rodict[ft], rcdict[ft]] = [[],[],[],[]]
+			endfor
+			continue
+		endif
 		let flaglist = []
 		for item in 'brWt'
 			call add(flaglist, flagstr =~ item)
 		endfor
-		if flagstr =~ 'f'
-			let forced = v:true
-		endif
 		let [iopats, icpats] = s:CalcIpats(a:c1, a:c2, flaglist)
 		for ft in split(ftypes, ',', v:true)
 			let iodict[ft] = iopats
@@ -153,10 +158,10 @@ function jhv#pair#Add(c1, c2, ...)
 		let lhs = substitute(substitute(item, '<', '<lt>', 'g'), '\\', '<Bslash>', 'g')
 		let rhs = substitute(substitute(string(item), '<', '<lt>', 'g'), '\\', '<Bslash>', 'g')
 		let cmd = printf(pat, lhs, rhs)
-		if forced
-			exe cmd
-		else
+		if g:jhv#pair#extend
 			call jhv#mappings#ExtendMap(cmd)
+		else
+			exe cmd
 		endif
 	endfor
 endfunction
