@@ -1,4 +1,4 @@
-*parse.txt*	Helpers for parsing strings
+*jhv#parse.txt*	Helpers for parsing strings
 
 							*jhv#parse#Mapping()*
 jhv#parse#Mapping(cmd[, startidx])

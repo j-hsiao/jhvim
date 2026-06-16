@@ -1,4 +1,4 @@
-*vsearch.txt*	Visual mode searching.
+*jhv#vsearch.txt*	Visual mode searching.
 
 								*v_star* *v_#*
 After highlighting, search forward/backward the selected text.

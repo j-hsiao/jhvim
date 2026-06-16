@@ -1,49 +1,80 @@
-*pair.txt* 	Simple automatic insertion of pairs when typing.
+*jhv#pair.txt* 	Simple automatic insertion of pairs when typing.
 
 							*jhv#pair#Add()*
 jhv#pair#Add(c1, c2[, flags...])
 Complete character pairs when the opening character is typed, but not when
-followed by '\w'. >
+followed by '\w'.
+
+NOTE: all examples use () as c1 and c2.
+
+With cursor at |, typing a left parenthesis results in: >
   txt |  ->  txt (|)
   func|  ->  func(|)
   |txt   ->  (|txt
-When deleting, empty character pairs will be deleted: >
-  func(|) -> func|
-  func()| -> func|
-For multi-character deletions, a simple pairing will be performed. >
-  [this(is{stuff|})]
-<<C-U> will leave the line empty:
-  After "stuff" is removed, the {} are deleted together.
-  After "is" is removed, the () are deleted together.
-  And after "this" is removed, [] are deleted together.
+When deleting, empty character pairs will be deleted.
+With cursor at |: >
+  <BS>  (|)stuff -> |stuff
+  <BS>  ()|stuff -> |stuff
+  <BS>  (|stuff) -> |stuff)
+In the 3rd example, "stuff" is between the pair so the ending
+pair is not automatically deleted.
+Multicharacter deletions are treated as repeated <BS>.
+  <C-U> [][this(is{stuff|})]]  ->  ]
+After "stuff" is removed, the {} are deleted together.
+After "is" is removed, the () are deleted together.
+And after "this" is removed, [] are deleted together.
+The first [] get deleted together.
+Only a lone ] remains.
 
-Default added pairs are: [], {}, (), '', "" and `` for markdown.
+							*jhv#pair-settings*
+Settings~
+jhv#pair#extend
+  bool, Use |ExtendMap| instead of overwriting any existing ones.
+jhv#pair#defaults
+  bool, Add the default pairings/mappings.  Otherwise, the user
+  must add them themselves (call jhv#pair#Add and add mappings for
+  <Plug>jhv_pair_remove_left; and <Plug>jhv_pair_prep_remove;
 
+  The default pairs are: [], {}, (), '', "" for all filetypes.
+  markdown additionally has ``.
+
+							*jhv#pair-flags*
 Flags~
-Flags are strings of the form [filetype,...]=flags
-'W': Do not complete the pair if preceded by a word
-'r': This is a regex-like item.  If preceded by a backslash, also add
-     a backslash to the closing item.
-     example: regex group \(\)
-       |
-       \|
-       \(|\)
-'t': Indicate the pair allows triple. ex. ```code block``` or '''python str'''
-     NOTE: This only applies if c1 and c2 are the same.  Otherwise, inserting
-     c1 3 times would automatically have c2 3 times after the cursor without
-     any extra handling.  Note this also allows usage after a word-like character
-     even if the W flag is given.
-     Example, raw python multiline string:
-       r|
-       r"|
-       r""|"
-       r"""|
-       r"""|"""
-'b': Insert the item if preceeded by a backslash rather than step over.
-'f': force map overwrite if already exist.  Otherwise |ExtendMap|
+Flags are strings of the form [filetype,...]=flags OR ^filetype,...
+If filetype is omitted, apply flags to all filetypes if not explicitly given.
+If ^filetype,..., all listed filetypes do not treat the characters as a pair.
 
-NOTE: This is just a simple implementation.  It could be a lot more complex
-depending on filetype etc.  For example, tcl has "" as quoted strings, but
-also {}.  most languages have "" and '', and some allow backslash escapes
-within '' but others do not.
+If no flags are specified, then apply default behavior to all file types.
 
+Flag Examples~
+Python uses the flag bW, everything else uses defaults except tcl which does
+not treat the characters as a pair. >
+  'python=bW', '', '^tcl'
+
+Markdown and text use 'b'. Everything else does NOT use this pair. >
+  'markdown,text=b'
+All files use 'b' as the flag. >
+  'b'
+
+Flag Values~
+'b': Insert the item if preceeded by a backslash rather than step over. >
+  \  ->  \(
+'r': regex-like pair.  Match opening char backslash. >
+  Insertion: \|  -> \(|\)
+  Deletion : \(|\)  ->
+'t': "triple" flag.  Also handle triple opening and closing chars.
+Also handle the case if W flag is given.
+Example: python multiline string:
+  normal example >
+    |
+    "|"
+    ""|
+    """|"""
+<  W flag example: >
+    r|
+    r"|
+    r""|"
+    r"""|
+    r"""|"""
+'W': Do NOT complete the pair if preceded by a word. >
+  func|  ->  func(|

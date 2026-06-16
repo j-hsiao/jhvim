@@ -1,4 +1,4 @@
-*mappings.txt*	Manipulate mappings.
+*jhv#mappings.txt*	Manipulate mappings.
 
 ===User Commands===
 								*:CopyMap*
