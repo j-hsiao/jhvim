@@ -60,11 +60,17 @@ function! jhv#vsearch#NoteSearch()
 		let result = matchlist(curline, pattern, idx)
 	endwhile
 	if len(target)
-		return join([
-			\ "\<C-\>\<C-N>",
-			\ '/\m^[[:blank:]]*\(.\)\1*\_$\_.',
-			\ '\_^[[:blank:]]*\V', target,
-			\ "\<CR>:nohl\<CR>zt"], '')
+		let pattern = join([
+			\ '\m^[[:blank:]]*\(.\)\1*\_$\_.',
+			\ '\_^[[:blank:]]*\V', target], '')
+		echom pattern
+		return search(pattern, 's') . 'zt'
+
+		"return join([
+		"	\ "\<C-\>\<C-N>",
+		"	\ '/\m^[[:blank:]]*\(.\)\1*\_$\_.',
+		"	\ '\_^[[:blank:]]*\V', target,
+		"	\ "\<CR>:nohl\<CR>zt"], '')
 	endif
 	echo 'No notes title detected.'
 	return ''

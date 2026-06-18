@@ -14,12 +14,14 @@ if jhv#pair#defaults
 	call jhv#pair#Add('[', ']')
 	call jhv#pair#Add('{', '}')
 
+	" <BS>, <C-U>, <C-W> will activate pair-aware removal.
 	ExtendMap before=1 keep=1 imap <BS> <Plug>jhv_pair_prep_remove;
 	ExtendMap imap <BS> <Plug>jhv_pair_remove_left;
-
 	ExtendMap before=1 keep=1 imap <C-W> <Plug>jhv_pair_prep_remove;
 	ExtendMap imap <C-W> <Plug>jhv_pair_remove_left;
-
 	ExtendMap before=1 keep=1 imap <C-U> <Plug>jhv_pair_prep_remove;
 	ExtendMap imap <C-U> <Plug>jhv_pair_remove_left;
+
+	" Allow easier rightward deletion to remove the auto-inserted pair.
+	inoremap <C-L> <Del>
 endif
