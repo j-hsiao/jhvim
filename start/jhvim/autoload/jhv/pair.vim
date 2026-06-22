@@ -184,6 +184,9 @@ endfunction
 
 function jhv#pair#PrepRemove()
 	"Prep for removal to see what was deleted
+	" TODO
+	" if cursor is at beginning... maybe should use
+	" getline(line('.')-1)??
 	let b:jhv_pair_pre_remove = getline('.')
 	return ''
 endfunction
