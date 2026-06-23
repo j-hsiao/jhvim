@@ -168,26 +168,50 @@ Mapping 4 just maps to mapping 1 after %(transition) to put vim back into the
 							*jhv#mappings#Tmap()*
 jhv#mappings#Tmap(treename, ...)
 Manage a tree of mappings.
-A tree of mappings generally consists of 4 groups of mappings:
-1. A "wait" mapping to remain in the tree. <Plug>Tmap:treename;  This
-   evaluates to nothing if a key is ready/pressed.  Otherwise, it will
-   re-enter the tree.
-2. Action maps to an action to perform (usually *map <Plug>action_name action)
-   The reason why these mappings are separated out is so they could be
-   nonrecursive.  The other mappings must be recursive so that they can
-   activate other mappings.
-3. Activation maps (LHS).  These should perform some action, usually done by
-   using one of the action maps, and then <Plug>Tmap:treename; to enter the
+
+Arguments are parsed with |jhv#parse#Settings()|.
+
+A tree of mappings consists of 4 types of mappings:
+1. A "wait" mapping to remain in the tree. "<Plug>Tmap:treename;" It evaluates
+   to nothing if a key is ready.  Otherwise it reactivate itself.
+2. Action map that does the action.  This is a separate mapping to allow nore
+   mappings.  The other mappings will generally call this mapping via {LHS}.
+3. Activation maps.  This would usually call a type2 mapping followed by the
+   type1 mapping.  Its {LHS} is usually more complicated than the
+   corresponding type4 mapping.  These mappings are the main way to enter the
    tree.
-4. Treemaps, mappings that are useable while in the tree.  These are mappings
-   where the LHS should begin with <Plug>Tmap:treename;
+4. Similar to a type3 mapping, these mappings have {LHS} which is the type1
+   mapping followed by the {LHS} of the provided map command.  The resulting
+   behavior is creating a map that can only be activated when the tree is
+   active.
+5. Same as a type2 mapping, except for the entry action if it differs
+   significantly from the {RHS} of the provided map command.  (if erhs,
+   rpre, or rpost, are provided)
 
-General usage would use group 3 mappings to enter the tree.
-group4 mappings to do actions while in the tree.  These should usually
-re-enter the tree so other tree mappings can be used directly.
+* Type1 mappings are only created once.
+* Type2 mappings are created with the provided map command.  Replace the {LHS}
+  with "<Plug>Tmap_do:treename:name" where name defaults to >
+    substitute({RHS} '[[:blank:]]', '_', 'g')
+* Type3 mappings have {LHS} match the provided map command by default.
+  Use the enter setting to change the {LHS}
+* Type4 have {LHS} match the provided map command and call other map types.
 
+settings:
+  * name: |str|, name of the action.  Default to <Plug>do:{RHS}
+  * enter: |str| or |bool|, key sequence.  If |v:true|, then match {LHS}.
+  * emode: |str|, the mode for the enter map if different.
+  * stop: bool, exit the tree after the action.
+  * SID: sid to replace <SID> in the mapping.
+  * verbose: bool, print map commands.
+  * rpre/rpost: strings to remove from rhs to create the type3 mapping
+  * pre/post: strings to add to rhs to create type3 mapping after rpre/rpost.
+  * erhs: explicitly specify the rhs of the type3 map.  This will result in an
+    extra mapping <Plug>Tmap_enter:tree:name; to perform this action.
 
-
+NOTE
+types 4 and 1 must be in the same map mode.
+type 3 could be in a different mode, but its action would need to different
+from simply {type2}{type1}
 
 ===Helper Functions===
 							*jhv#mappings#Map2Estr()*

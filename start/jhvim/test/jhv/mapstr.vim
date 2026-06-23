@@ -38,3 +38,7 @@ else
 	endfor
 	let v:errors = []
 endif
+
+call jhv#mappings#Tmap('t1', 'verbose=1 name=printa enter=["n","aaa"] nnoremap a :echom "a" . join(reltime(), ":")<CR>')
+call jhv#mappings#Tmap('t1', 'verbose=1 name=printb nnoremap b :echom "b" . join(reltime(), ":")<CR>')
+nmap bbb <Plug>Tmap_do:printb;<Plug>Tmap:t1;
