@@ -187,7 +187,7 @@ function jhv#pair#PrepRemove()
 	" TODO
 	" if cursor is at beginning... maybe should use
 	" getline(line('.')-1)??
-	let b:jhv_pair_pre_remove = getline('.')
+	let b:jhv_pair_pre_remove = [col('.'), getline('.')]
 	return ''
 endfunction
 
@@ -241,7 +241,13 @@ endfunction
 " If opening char detected and matches end of soft stack, pop it.
 " Othewrise, compare with right string.  If removal, clear the stack too.
 function jhv#pair#RemoveLeft()
-	let previous = b:jhv_pair_pre_remove
+	let [precol, previous] = b:jhv_pair_pre_remove
+	if precol == 1
+		"From experimentation, it seems backwards deletes
+		"From column 1 will at most delete the joining newline.
+		"If greater than column 1, then at most to start of current line.
+		return ''
+	endif
 	let curline = getline('.')
 	let startidx = col('.')-1
 	let before = strpart(previous, 0, startidx + (len(previous) - len(curline)))
