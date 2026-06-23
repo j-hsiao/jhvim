@@ -20,8 +20,7 @@ else
 	let s:noop = '"<Bslash><lt>Ignore>"'
 endif
 
-"Convert a string as typed for a mapping to a 
-function jhv#mappings#LHS2eval(mpcmd, ...)
+function jhv#mappings#Map2Estr(mpcmd, ...)
 	if a:0
 		let quoteit = a:1
 	else
@@ -46,7 +45,7 @@ function jhv#mappings#LHS2eval(mpcmd, ...)
 	return ret
 endfunction
 
-function jhv#mappings#eval2RHS(mpstr)
+function jhv#mappings#Str2Map(mpstr)
 	let ret = a:mpstr
 	for [seq, replace] in [
 		\ ['<', '<lt>'],
@@ -62,8 +61,14 @@ function jhv#mappings#eval2RHS(mpstr)
 endfunction
 
 
+function jhv#mappings#Tmap(...)
+	let settingnames = ['name']
+	let [settings, mapcmd] = call('jhv#parse#Settings', extend([settingnames], a:000))
 
-function! jhv#mappings#Repeatable(...)
+endfunction
+
+
+function jhv#mappings#Repeatable(...)
 	let settingnames = ['makemap', 'mode', 'name', 'repeat', 'transition', 'verbose', 'SID']
 	let [settings, mapcmd] = call('jhv#parse#Settings', extend([settingnames], a:000))
 	let makemap = get(settings, 'makemap', 1)
@@ -119,7 +124,7 @@ function! jhv#mappings#Repeatable(...)
 	" reproduce this behavior.
 	let wtmap = printf(
 		\ '%smap <silent> <special> <expr> %s getchar(1) == 0 ? (%s . "%s") : ""',
-		\ mode, waitname, s:noop, jhv#mappings#eval2RHS(jhv#mappings#LHS2eval(waitname, 0)))
+		\ mode, waitname, s:noop, jhv#mappings#Str2Map(jhv#mappings#Map2Estr(waitname, 0)))
 	if empty(transition)
 		if mode != mapmode
 			if mode == 'n'
@@ -202,7 +207,7 @@ function jhv#mappings#CopyMap(mode, lhs, newlhs, ...)
 		execute printf('%snoremap %s %s', a:mode, a:newlhs, a:lhs)
 	else
 		let dct['lhs'] = a:newlhs
-		let dct['lhsraw'] = eval(jhv#mappings#LHS2eval(a:newlhs))
+		let dct['lhsraw'] = eval(jhv#mappings#Map2Estr(a:newlhs))
 		call s:MapSet(dct)
 	endif
 endfunction
@@ -275,7 +280,7 @@ function jhv#mappings#ExtendMap(...)
 	else
 		if mapdict['expr']
 			let sep = ' . '
-			let plugname = jhv#mappings#eval2RHS(jhv#mappings#LHS2eval(plugname))
+			let plugname = jhv#mappings#Str2Map(jhv#mappings#Map2Estr(plugname))
 		else
 			let sep = ''
 		endif

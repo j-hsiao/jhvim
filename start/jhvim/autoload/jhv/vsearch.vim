@@ -1,4 +1,4 @@
-function! jhv#vsearch#Search(chr, useic)
+function jhv#vsearch#Search(chr, useic)
 	" search() does not allow use of n/p to go to next.
 	" chr: search direction '/'=forward, '?'=backward
 	" useic: false = case sensitive, always exact
@@ -28,7 +28,7 @@ function! jhv#vsearch#Search(chr, useic)
 	return join(ret, '')
 endfunction
 
-function! jhv#vsearch#NoteSearch()
+function jhv#vsearch#NoteSearch()
 	" Search for the -N.N.N- that I use for header in my notes.
 	" Allow N to also be X to indicate un-set numbering
 	" It should be surrounded by some kind of barrier

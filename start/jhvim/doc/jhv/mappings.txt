@@ -165,21 +165,51 @@ Mapping 3 is intentionally ambiguous with mapping 4.  As a result, vim will
 Mapping 4 just maps to mapping 1 after %(transition) to put vim back into the
 	appropraite mode before re-activating {rhs}.
 
+							*jhv#mappings#Tmap()*
+jhv#mappings#Tmap(treename, ...)
+Manage a tree of mappings.
+A tree of mappings generally consists of 4 groups of mappings:
+1. A "wait" mapping to remain in the tree. <Plug>Tmap:treename;  This
+   evaluates to nothing if a key is ready/pressed.  Otherwise, it will
+   re-enter the tree.
+2. Action maps to an action to perform (usually *map <Plug>action_name action)
+   The reason why these mappings are separated out is so they could be
+   nonrecursive.  The other mappings must be recursive so that they can
+   activate other mappings.
+3. Activation maps (LHS).  These should perform some action, usually done by
+   using one of the action maps, and then <Plug>Tmap:treename; to enter the
+   tree.
+4. Treemaps, mappings that are useable while in the tree.  These are mappings
+   where the LHS should begin with <Plug>Tmap:treename;
+
+General usage would use group 3 mappings to enter the tree.
+group4 mappings to do actions while in the tree.  These should usually
+re-enter the tree so other tree mappings can be used directly.
+
+
+
+
 ===Helper Functions===
-							*jhv#mappings#LHS2eval()*
-jhv#mappings#LHS2eval(mpcmd, quote=1)
+							*jhv#mappings#Map2Estr()*
+jhv#mappings#Map2Estr(mpcmd, quote=1)
+Return a string that can be |eval()|ed as the string representation of the
+map key sequence.
+Example: >
+	eval(jhv#mappings#Map2Estr('<C-X>\')) == "\<C-X>\\"
+This is useful for creating strings that can be used with exec. or eval
 Return a string that would evaluate to a:mpcmd when passed to |eval()|.
 If quote, then the string is also surrounded with double quotes.  Otherwise
-it is given unquoted for insertion into a str.  Add backslashes in front of
-quotes and backslashes.  Also convert key-notation "<...>" to "\<...>".
+the quotes are omitted.  This is useful if the result is intended for use
+inside a string such as: >
+	eval(printf('"%s %s..."', jhv#mappings#Map2Estr('<C-X>\', 0), ...))
+<
 
-							*jhv#mappings#eval2RHS()*
-jhv#mappings#eval2RHS(mpstr)
-Convert a str into an appropriate string for use in the {rhs} of a mapping.
-Even when expr, {rhs} is still evaluated as a mapping so <lt> should be used
-in place of a single <.
-
-
+							*jhv#mappings#Str2Map()*
+jhv#mappings#Str2Map(mpstr)
+Convert a str into an appropriate string for use in the {rhs} of a mapping to
+retain the original value.  Basically, convert specific characters to their
+<Name> format so when used as RHS of an <expr> mapping, the string will not
+change meaning.
 
 
  vim:tw=78:ts=8:noet:ft=help:norl:
