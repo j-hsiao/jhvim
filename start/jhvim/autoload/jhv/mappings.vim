@@ -156,7 +156,7 @@ function! jhv#mappings#Repeatable(...)
 endfunction
 
 function s:ExtendName(name, mode)
-	let pattern = printf('<Plug>ExtendMap:%s:%%d:%s;', a:mode, a:name)
+	let pattern = printf('<Plug>ExtendMap:%s:%s:<Plug>%%d;', a:mode, a:name)
 	let i = 0
 	while !empty(maparg(printf(pattern, i), a:mode))
 		let i += 1
