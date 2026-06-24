@@ -6,18 +6,18 @@
 if match("\<Ignore>", '<Ignore>') >= 0
 	if match("\<Cmd>", '<Cmd>') < 0
 		" :h map-table
-		noremap <silent> <Plug>repeatable_nop; <Cmd>exec ''<CR>
-		lnoremap <silent> <Plug>repeatable_nop; <Cmd>exec ''<CR>
-		tnoremap <silent> <Plug>repeatable_nop; <Cmd>exec ''<CR>
+		noremap <silent> <Plug>jhv_mappings_nop; <Cmd>exec ''<CR>
+		lnoremap <silent> <Plug>jhv_mappings_nop; <Cmd>exec ''<CR>
+		tnoremap <silent> <Plug>jhv_mappings_nop; <Cmd>exec ''<CR>
 	else
-		nnoremap <silent> <Plug>repeatable_nop; :exec ''<CR>
-		inoremap <silent> <Plug>repeatable_nop; <C-R>=''<CR>
-		vnoremap <silent> <Plug>repeatable_nop; g<C-G>
+		nnoremap <silent> <Plug>jhv_mappings_nop; :exec ''<CR>
+		inoremap <silent> <Plug>jhv_mappings_nop; <C-R>=''<CR>
+		vnoremap <silent> <Plug>jhv_mappings_nop; g<C-G>
 		" Todo: the other modes?
 	endif
-	let s:noop = '"<Bslash><lt>Plug>repeatable_nop;"'
+	let s:noop = '<Bslash><lt>Plug>jhv_mappings_nop;'
 else
-	let s:noop = '"<Bslash><lt>Ignore>"'
+	let s:noop = '<Bslash><lt>Ignore>'
 endif
 
 function jhv#mappings#Map2Estr(mpcmd, ...)
@@ -78,6 +78,11 @@ function jhv#mappings#Tmap(tree, ...)
 		let [ignore, tree, mp; ignore] = matchlist(a:tree, '\m^\([^[:blank:]]*\)[[:blank:]]*\(.*\)')
 		let [settings, mapcmd] = call('jhv#parse#Settings', extend([settingnames], [mp]))
 	endif
+	if get(settings, 'verbose', v:false)
+		for [item, value] in items(settings)
+			echom printf('%s: %s', item, value)
+		endfor
+	endif
 
 	let mapmatch = jhv#parse#Mapping(substitute(
 		\ mapcmd, '<SID>', get(settings, 'SID', '<SID>'), 'g'))
@@ -85,13 +90,16 @@ function jhv#mappings#Tmap(tree, ...)
 		throw printf('Invalid map command: %s', mapcmd)
 	endif
 	let [mapline, mapcmd, mapmode, mapnore, mapargs, lhs, rhs; ignored] = mapmatch
+	if match(rhs, '\m[[:blank:]]\(s:\|<SID>\)[a-zA-Z0-9_]') >= 0
+		echohl WarningMsg | echom 'WARNING: Tmap <SID> was not replaced' | echohl None
+	endif
 
 	let treename = printf('<Plug>Tmap:%s;', tree)
 	let maps = []
 	if maparg(treename, mapmode) == ''
 		call add(maps, printf(
-			\ '%smap <silent> <special> <expr> %s getchar(1) ? "" : (%s . %s)',
-			\ mapmode, treename, s:noop, jhv#mappings#Str2Map(jhv#mappings#Map2Estr(treename))))
+			\ '%smap <silent> <special> <expr> %s getchar(1) ? "" : "%s%s"',
+			\ mapmode, treename, s:noop, jhv#mappings#Str2Map(jhv#mappings#Map2Estr(treename,0))))
 
 	endif
 	if !empty(get(settings, 'exit', ''))
@@ -103,7 +111,7 @@ function jhv#mappings#Tmap(tree, ...)
 		let name = s:Autoname('TmapAction%d')
 	endif
 	let name = printf('<Plug>Tmap_do:%s:%s;', tree, name)
-	call add(maps, printf('%s %s %s %s', mapcmd, mapargs, name, rhs))
+	call add(maps, printf('%s <special> %s %s %s', mapcmd, mapargs, name, rhs))
 	let enter = get(settings, 'enter', v:true)
 	if !empty(enter)
 		let pre = get(settings, 'pre', '')
@@ -132,7 +140,7 @@ function jhv#mappings#Tmap(tree, ...)
 			let erhs = name . treename
 		else
 			let ename = substitute(name, 'Tmap_do', 'Tmap_enter', '')
-			call add(maps, printf('%smap %s %s %s', emode, mapargs, ename, erhs))
+			call add(maps, printf('%smap <special> %s %s %s', emode, mapargs, ename, erhs))
 			let erhs = ename . treename
 		endif
 		let emode = emode[:0]
@@ -167,11 +175,9 @@ function jhv#mappings#Repeatable(...)
 	endif
 	let [mapline, mapcmd, mapmode, mapnore, mapargs, lhs, rhs; ignored] = mapmatch
 	if verbose
-		for k in split('makemap mode name repeat transition verbose SID')
+		for k in settingnames
 			echom printf('%10s = "%s"', k, get(l:, k))
 		endfor
-	endif
-	if verbose
 		for k in split('mapline mapcmd mapmode mapargs lhs rhs')
 			echom printf('%7s: "%s"', k, get(l:, k))
 		endfor
@@ -201,7 +207,7 @@ function jhv#mappings#Repeatable(...)
 	" NOT being mapped to any mappings.  However, I cannot seem to
 	" reproduce this behavior.
 	let wtmap = printf(
-		\ '%smap <silent> <special> <expr> %s getchar(1) == 0 ? (%s . "%s") : ""',
+		\ '%smap <silent> <special> <expr> %s getchar(1) ? "" : ("%s%s")',
 		\ mode, waitname, s:noop, jhv#mappings#Str2Map(jhv#mappings#Map2Estr(waitname, 0)))
 	if empty(transition)
 		if mode != mapmode
