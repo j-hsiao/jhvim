@@ -60,40 +60,57 @@ function jhv#mappings#Str2Map(mpstr)
 	return ret
 endfunction
 
+let s:autonum = 0
+function s:Autoname(pat)
+	let ret = printf(a:pat, s:autonum)
+	let s:autonum += 1
+	return ret
+endfunction
 
 function jhv#mappings#Tmap(tree, ...)
-	let settingnames = ['name', 'enter', 'emode', 'stop', 'SID', 'verbose', 'pre', 'post', 'rpre', 'rpost', 'erhs']
-	let [settings, mapcmd] = call('jhv#parse#Settings', extend([settingnames], a:000))
-	let name = get(settings, 'name', '')
-	let enter = get(settings, 'enter', v:true)
-	let stop = get(settings, 'stop', v:false)
-	let SID = get(settings, 'SID', '<SID>')
-	let verbose = get(settings, 'verbose', v:false)
-	let pre = get(settings, 'pre', '')
-	let rpre = get(settings, 'rpre', '')
-	let post = get(settings, 'post', '')
-	let rpost = get(settings, 'rpost', '')
-	let erhs = get(settings, 'erhs', '')
+	let settingnames = [
+		\ 'name', 'enter', 'emode', 'stop', 'exit', 'SID', 'verbose',
+		\ 'pre', 'post', 'rpre', 'rpost', 'erhs']
+	if a:0
+		let [settings, mapcmd] = call('jhv#parse#Settings', extend([settingnames], a:000))
+		let tree = a:tree
+	else
+		let [ignore, tree, mp; ignore] = matchlist(a:tree, '\m^\([^[:blank:]]*\)[[:blank:]]*\(.*\)')
+		let [settings, mapcmd] = call('jhv#parse#Settings', extend([settingnames], [mp]))
+	endif
 
-
-	let mapmatch = jhv#parse#Mapping(substitute(mapcmd, '<SID>', SID, 'g'))
+	let mapmatch = jhv#parse#Mapping(substitute(
+		\ mapcmd, '<SID>', get(settings, 'SID', '<SID>'), 'g'))
 	if empty(mapmatch)
 		throw printf('Invalid map command: %s', mapcmd)
 	endif
 	let [mapline, mapcmd, mapmode, mapnore, mapargs, lhs, rhs; ignored] = mapmatch
 
-	let treename = printf('<Plug>Tmap:%s;', a:tree)
+	let treename = printf('<Plug>Tmap:%s;', tree)
 	let maps = []
 	if maparg(treename, mapmode) == ''
 		call add(maps, printf(
 			\ '%smap <silent> <special> <expr> %s getchar(1) ? "" : (%s . %s)',
 			\ mapmode, treename, s:noop, jhv#mappings#Str2Map(jhv#mappings#Map2Estr(treename))))
 
-		call add(maps, printf('%smap <silent> <special> <expr> %s<Esc> ""', mapmode, treename))
 	endif
-	let name = printf('<Plug>Tmap_do:%s:%s;', a:tree, get(settings, 'name', substitute(rhs, '\m[[:blank:]]', '_', 'g')))
+	if !empty(get(settings, 'exit', ''))
+		call add(maps, printf('%smap <silent> <special> <expr> %s%s ""',
+			\ mapmode, treename, get(settings, 'exit')))
+	endif
+	let name = get(settings, 'name', '')
+	if empty(name)
+		let name = s:Autoname('TmapAction%d')
+	endif
+	let name = printf('<Plug>Tmap_do:%s:%s;', tree, name)
 	call add(maps, printf('%s %s %s %s', mapcmd, mapargs, name, rhs))
+	let enter = get(settings, 'enter', v:true)
 	if !empty(enter)
+		let pre = get(settings, 'pre', '')
+		let rpre = get(settings, 'rpre', '')
+		let post = get(settings, 'post', '')
+		let rpost = get(settings, 'rpost', '')
+		let erhs = get(settings, 'erhs', '')
 		if type(enter) != v:t_string
 			let enter = lhs
 		endif
@@ -118,10 +135,12 @@ function jhv#mappings#Tmap(tree, ...)
 			call add(maps, printf('%smap %s %s %s', emode, mapargs, ename, erhs))
 			let erhs = ename . treename
 		endif
+		let emode = emode[:0]
 		call add(maps, printf('%smap <special> %s %s', emode, enter, erhs))
 	endif
-	call add(maps, printf('%smap <special> %s%s %s%s', mapmode, treename, lhs, name, stop ? '' : treename))
-
+	call add(maps, printf('%smap <special> %s%s %s%s', mapmode, treename, lhs,
+	                      \ name, get(settings, 'stop', v:false) ? '' : treename))
+	let verbose = get(settings, 'verbose', v:false)
 	for item in maps
 		if verbose
 			echom printf('Creating map: %s', item)
@@ -220,12 +239,7 @@ function jhv#mappings#Repeatable(...)
 endfunction
 
 function s:ExtendName(name, mode)
-	let pattern = printf('<Plug>ExtendMap:%s:%s:<Plug>%%d;', a:mode, a:name)
-	let i = 0
-	while !empty(maparg(printf(pattern, i), a:mode))
-		let i += 1
-	endwhile
-	return printf(pattern, i)
+	return s:Autoname(printf('<Plug>ExtendMap:%s:%s:<Plug>%%d;', a:mode, a:name))
 endfunction
 
 function s:MapSet(dct)
