@@ -1,33 +1,58 @@
 *jhv#mappings.txt*	Manipulate mappings.
 
+Mappings sees maps as 2 types: keymaps and action maps.
+key maps~
+These map keys to a sequence of actions.  {lhs} will be prefixed with >
+  <Plug>tree:treename;
+or nothing, if no tree.  The {rhs} will be a concatenation of action map
+{lhs}s.  This structure allows easy management of actions per key map.
+Because the keymap activates action maps, it MUST be recursive.
+
+action maps~
+Action maps have {lhs} of the form: >
+  <Plug>jhvmap:tree:name:uniq;
+These mappings represent a single action to be performed.  tree and name
+should not contain blanks, semicolons, or colons.  Semicolons and colons are
+used as delimiters and blanks will break the {lhs} in a map command without
+explicit escaping.  uniq is a unique string, currently implemented as an
+incremented number.
+
+Map trees~
+Maps are further grouped into "trees".  Mappings in a tree are key maps
+prefixed with >
+  <Plug>tree:treename;
+As a result, they are all |map-ambiguous| with eachother and branch out from
+the same tree.  Trees thus act similarly to a namespace.  If the tree name is
+empty, this is like a global namespace, and in this case, the prefix is empty.
+
+The prefix itself is a mapping that maps to nothing if any key is ready and
+otherwise, maps back to itself.  This allows vim to remain in the tree,
+waiting for some tree action.  Most keymaps end with the prefix as well so
+that other tree actions can be performed.  The empty tree does not need this
+map.
+
+
 ===User Commands===
-								*:CopyMap*
-:CopyMap mode lhs newlhs
-Pass arguments to |jhv#mappings#CopyMap()|.
+The user commands wrap the corresponding function and pass arguments directly
+to them.
 
-								*:ExtendMap*
-:ExtendMap [setting=value ...] *map [<map-args...] {lhs} {rhs}
-This is the User command version of |jhv#mappings#ExtendMap()|. All arguments
-are treated as a single string and passed to that function.
-
-								*:Repeatable*
-:Repeatable [setting=value ...] *map [<map-args>...] {lhs} {rhs}
-This is the User command version of |jhv#mappings#Repeatable()|.  All arguments
-are treated as a single string and passed to |jhv#mappings#Repeatable()|.
-
-
+command     function
+*:CopyMap*    |jhv#mappings#Copymap()|
+*:ExtendMap*  |jhv#mappings#ExtendMap()|
+*:Repeatable* |jhv#mappings#Repeatable()|
+*:Tmap*       |jhv#mappings#Tmap()|
 
 ===Functions===
 						*jhv#mappings#CopyMap()*
-jhv#mappings#CopyMap(mode, lhs, newlhs)
-Copy the current mapping to {lhs} in the given mode to a {newlhs}.  This saves
-a copy of the mapping at the time of this call to {newlhs}.  Changes to the
-original {lhs} mapping will NOT be reflected in the {newlhs} mapping.
+|jhv#mappings#CopyMap(|mode, lhs, newlhs)
+Copy the current mapping to {lhs} in the given mode to a {newlhs}.
 
 						*jhv#mappings#ExtendMap()*
-This function adds a mapping command to the left or right of an existing map
-command.  If the map does not already exist, it will be created.
-
+|jhv#mappings#ExtendMap(|...)
+Add a mapping to the beginning or end of an existing mapping.
+Arguments are strings that are concatenated together.  The final string should
+look like >
+    [setting=value]... *map <map-args> {lhs} {rhs}
 Settings~
 	before: bool=v:false, the new {rhs} should go before the original.
 	keep: bool=v:false, Keep the lhs if no prior mapping.

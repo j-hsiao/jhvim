@@ -20,7 +20,7 @@ else
 	let s:noop = '<Bslash><lt>Ignore>'
 endif
 
-function jhv#mappings#Map2Estr(mpcmd, ...)
+function s:Map2Estr(mpcmd, ...)
 	if a:0
 		let quoteit = a:1
 	else
@@ -45,7 +45,7 @@ function jhv#mappings#Map2Estr(mpcmd, ...)
 	return ret
 endfunction
 
-function jhv#mappings#Str2Map(mpstr)
+function s:Str2Map(mpstr)
 	let ret = a:mpstr
 	for [seq, replace] in [
 		\ ['<', '<lt>'],
@@ -60,12 +60,106 @@ function jhv#mappings#Str2Map(mpstr)
 	return ret
 endfunction
 
+function jhv#mappings#Map2Estr(...)
+	return call('s:Map2Estr', a:000)
+endfunction
+function jhv#mappings#Str2Map(...)
+	return call('s:Str2Map', a:000)
+endfunction
+
+
 let s:autonum = 0
 function s:Autoname(pat)
-	let ret = printf(a:pat, s:autonum)
+	" TODO remove this
 	let s:autonum += 1
-	return ret
+	return printf(a:pat, s:autonum)
 endfunction
+function s:Name(lhs)
+	return substitute(a:lhs, '\m[[:blank:]:;]', '_', 'g')
+endfunction
+
+function s:Tree(tree)
+	"Return the LHS for the main tree map.
+	return printf('<Plug>tree:%s;', s:Name(a:tree))
+endfunction
+
+function jhv#mappings#MakeTree(tree, mode)
+	if empty(a:tree)
+		" No tree, no map needed.
+		return
+	endif
+	let treelhs = s:Tree(a:tree)
+	exec printf(
+		\ '%smap <special> <silent> <expr> %s getchar(1) ? "" : "%s%s"',
+		\ a:mode, treelhs, s:noop, jhv#mappings#Str2Map(jhv#mappings#Map2Estr(treelhs, 0)))
+endfunction
+
+function s:MapSet(dct)
+	" NOTE It seems like nmap ...
+	" to search for mappings uses the 'lhsraw' entry to the dict.
+	" However, if I just use "\<C-K>" as the lhsraw, then nmap will not find
+	" that mapping.  Only if lhsraw is "\x80\xfc\<C-D>K" can it be found.
+	" But how to calculate lhsraw? Removing lhsraw and calling mapset does not
+	" recalculate the value of lhsraw.  It just errors out saying missing
+	" entries.
+	" Searching, apparently ?maybe? newer vim versions have a keytrans() and
+	" keycode() that could be used to convert '<...>' to the ?appropriate?
+	" lhsraw, but not sure...
+	" Probably prefer to have a proper lhsraw over the correct 'sid'
+	" since the 'sid' can be replaced anyways but *incorrect* lhsraw means
+	" that the mapping cannot be properly searched for with the *map commands.
+	" 8.2 has neither.
+	" 9.1 seems to have a keytrans() (lhsraw to lhs) but no keycode()
+	if exists('*keycode') && exists('*mapset')
+		let a:dct['lhsraw'] = keycode(a:dct['lhs'])
+		call mapset(a:dct['mode'], v:false, a:dct)
+	else
+		let mpcmd = [printf('%s%smap', a:dct['mode'], (a:dct['noremap'] ? 'nore' : ''))]
+		for mapargu in ['buffer', 'nowait', 'silent', 'script', 'expr']
+			if get(a:dct, mapargu, v:false)
+				call add(mpcmd, printf('<%s>', mapargu))
+			endif
+		endfor
+		call add(mpcmd, a:dct['lhs'])
+		call add(mpcmd, substitute(a:dct['rhs'], '<SID>', printf('<SNR>%s_', a:dct['sid']), 'g'))
+		execute join(mpcmd, ' ')
+	endif
+endfunction
+
+function jhv#mappings#CopyMap(mode, lhs, newlhs, ...)
+	let dct = a:0 > 0 ? a:1 : maparg(a:lhs, a:mode, v:false, v:true)
+	if empty(dct)
+		execute printf('%snoremap %s %s', a:mode, a:newlhs, a:lhs)
+	else
+		let dct['lhs'] = a:newlhs
+		let dct['lhsraw'] = eval(jhv#mappings#Map2Estr(a:newlhs))
+		call s:MapSet(dct)
+	endif
+endfunction
+
+function s:NormalizeKeymap(tree, mode, lhs, keep)
+	"Normalize a map into the *map <lhs> <Plug>... format.
+	"and return the corresponding map dictionary.
+	"if keep, then if no mapping exists, create non-recursive one that maps to
+	"the original lhs.
+
+	let keylhs = s:Tree(a:tree) . a:lhs
+
+	let rhs = maparg(a:lhs, a:mode)
+
+	if empty(rhs)
+		if a:keep
+			exec printf('%snoremap <special> %s %s', a:mode, a:lhs, a:lhs)
+		else
+			return {}
+		endif
+	elseif match(rhs,'\m^\%(<Plug>jhvmap:[^:;]*:[^:;]*:[^:;]*;\)*\%(<Plug>tree:[^:;]*;\)\?$' ) < 0
+	else
+	endif
+	mapdict['rhs']
+endfunction
+
+
 
 function jhv#mappings#Tmap(tree, ...)
 	let settingnames = [
@@ -248,48 +342,6 @@ function s:ExtendName(name, mode)
 	return s:Autoname(printf('<Plug>ExtendMap:%s:%s:<Plug>%%d;', a:mode, a:name))
 endfunction
 
-function s:MapSet(dct)
-	" NOTE It seems like nmap ...
-	" to search for mappings uses the 'lhsraw' entry to the dict.
-	" However, if I just use "\<C-K>" as the lhsraw, then nmap will not find
-	" that mapping.  Only if lhsraw is "\x80\xfc\<C-D>K" can it be found.
-	" But how to calculate lhsraw? Removing lhsraw and calling mapset does not
-	" recalculate the value of lhsraw.  It just errors out saying missing
-	" entries.
-	" Searching, apparently ?maybe? newer vim versions have a keytrans() and
-	" keycode() that could be used to convert '<...>' to the ?appropriate?
-	" lhsraw, but not sure...
-	" Probably prefer to have a proper lhsraw over the correct 'sid'
-	" since the 'sid' can be replaced anyways but *incorrect* lhsraw means
-	" that the mapping cannot be properly searched for with the *map commands.
-	" 8.2 has neither.
-	" 9.1 seems to have a keytrans() (lhsraw to lhs) but no keycode()
-	if exists('*keycode') && exists('*mapset')
-		let a:dct['lhsraw'] = keycode(a:dct['lhs'])
-		call mapset(a:dct['mode'], v:false, a:dct)
-	else
-		let mpcmd = [printf('%s%smap', a:dct['mode'], (a:dct['noremap'] ? 'nore' : ''))]
-		for mapargu in ['buffer', 'nowait', 'silent', 'script', 'expr']
-			if get(a:dct, mapargu, v:false)
-				call add(mpcmd, printf('<%s>', mapargu))
-			endif
-		endfor
-		call add(mpcmd, a:dct['lhs'])
-		call add(mpcmd, substitute(a:dct['rhs'], '<SID>', printf('<SNR>%s_', a:dct['sid']), 'g'))
-		execute join(mpcmd, ' ')
-	endif
-endfunction
-
-function jhv#mappings#CopyMap(mode, lhs, newlhs, ...)
-	let dct = a:0 > 0 ? a:1 : maparg(a:lhs, a:mode, v:false, v:true)
-	if empty(dct)
-		execute printf('%snoremap %s %s', a:mode, a:newlhs, a:lhs)
-	else
-		let dct['lhs'] = a:newlhs
-		let dct['lhsraw'] = eval(jhv#mappings#Map2Estr(a:newlhs))
-		call s:MapSet(dct)
-	endif
-endfunction
 
 function jhv#mappings#ExtendMap(...)
 	let settingnames = ['before', 'keep', 'name', 'SID', 'verbose', 'rep']
