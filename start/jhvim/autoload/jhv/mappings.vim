@@ -60,6 +60,7 @@ function s:Str2Map(mpstr)
 	return ret
 endfunction
 
+"for debugging...
 function jhv#mappings#Map2Estr(...)
 	return call('s:Map2Estr', a:000)
 endfunction
@@ -67,31 +68,37 @@ function jhv#mappings#Str2Map(...)
 	return call('s:Str2Map', a:000)
 endfunction
 
-
-let s:autonum = 0
-function s:Autoname(pat)
-	" TODO remove this
-	let s:autonum += 1
-	return printf(a:pat, s:autonum)
-endfunction
 function s:Name(lhs)
+	" Convert a keyseq to a name-like string
 	return substitute(a:lhs, '\m[[:blank:]:;]', '_', 'g')
 endfunction
 
-function s:Tree(tree)
-	"Return the LHS for the main tree map.
-	return printf('<Plug>tree:%s;', s:Name(a:tree))
+let s:autonum = 0
+function s:ActionmapLHS(tree, key)
+	" Generate an actionmap LHS.
+	let s:autonum += 1
+	return printf('<Plug>jhvmap:%s:%s:%d;', s:Name(a:tree), s:Name(a:key), s:autonum)
 endfunction
 
-function jhv#mappings#MakeTree(tree, mode)
+function s:KeymapLHS(tree, key)
+	"Return the LHS for a keymap"
+	if empty(a:tree)
+		return a:key
+	else
+		return printf('<Plug>jhvtree:%s;%s', s:Name(a:tree), a:key)
+	endif
+endfunction
+
+function s:MakeTree(tree, mode)
+	" Create the base keymap for the tree.
 	if empty(a:tree)
 		" No tree, no map needed.
 		return
 	endif
-	let treelhs = s:Tree(a:tree)
+	let lhs = s:KeymapLHS(a:tree, '')
 	exec printf(
 		\ '%smap <special> <silent> <expr> %s getchar(1) ? "" : "%s%s"',
-		\ a:mode, treelhs, s:noop, jhv#mappings#Str2Map(jhv#mappings#Map2Estr(treelhs, 0)))
+		\ a:mode, lhs, s:noop, jhv#mappings#Str2Map(jhv#mappings#Map2Estr(lhs, 0)))
 endfunction
 
 function s:MapSet(dct)
@@ -138,28 +145,30 @@ function jhv#mappings#CopyMap(mode, lhs, newlhs, ...)
 endfunction
 
 function s:NormalizeKeymap(tree, mode, lhs, keep)
-	"Normalize a map into the *map <lhs> <Plug>... format.
-	"and return the corresponding map dictionary.
-	"if keep, then if no mapping exists, create non-recursive one that maps to
-	"the original lhs.
-
-	let keylhs = s:Tree(a:tree) . a:lhs
-
-	let rhs = maparg(a:lhs, a:mode)
-
-	if empty(rhs)
+	"Return [lhs, rhs] for a normalized keymap.
+	"If keep, then keep the action even if there is no mapping.
+	let lhs = s:KeymapLHS(a:tree, a:lhs)
+	let mdict = maparg(lhs, a:mode, 0, 1)
+	if empty(mdict)
 		if a:keep
-			exec printf('%snoremap <special> %s %s', a:mode, a:lhs, a:lhs)
+			let action = s:ActionmapLHS(a:tree, a:lhs)
+			exec printf('%snoremap <special> %s %s', a:mode, action, a:lhs)
+			return [lhs, action, s:KeymapLHS(a:tree, '')]
 		else
-			return {}
+			return [lhs, '', s:KeymapLHS(a:tree, '')]
 		endif
-	elseif match(rhs,'\m^\%(<Plug>jhvmap:[^:;]*:[^:;]*:[^:;]*;\)*\%(<Plug>tree:[^:;]*;\)\?$' ) < 0
 	else
+		let parsed = matchlist(mdict['rhs'], '\m^\(\%(<Plug>jhvmap:[^:;]*:[^:;]*:[^:;]*;\)*\)\(<Plug>jhvtree:[^:;]*;\)\?$' )
+		if empty(parsed)
+			let action = s:ActionmapLHS(a:tree, a:lhs)
+			jhv#mappings#CopyMap(a:mode, lhs, action, mdict)
+			return [lhs, action, s:KeymapLHS(a:tree, '')]
+		else
+			let [whole, actions, rep; ignored] = parsed
+			return [lhs, actions, rep]
+		endif
 	endif
-	mapdict['rhs']
 endfunction
-
-
 
 function jhv#mappings#Tmap(tree, ...)
 	let settingnames = [
@@ -169,7 +178,7 @@ function jhv#mappings#Tmap(tree, ...)
 		let [settings, mapcmd] = call('jhv#parse#Settings', extend([settingnames], a:000))
 		let tree = a:tree
 	else
-		let [ignore, tree, mp; ignore] = matchlist(a:tree, '\m^\([^[:blank:]]*\)[[:blank:]]*\(.*\)')
+		let [whole, tree, mp; ignore] = matchlist(a:tree, '\m^[[:blank:]]*\([^[:blank:]]*\)[[:blank:]]*\(.*\)')
 		let [settings, mapcmd] = call('jhv#parse#Settings', extend([settingnames], [mp]))
 	endif
 	if get(settings, 'verbose', v:false)
@@ -251,6 +260,12 @@ function jhv#mappings#Tmap(tree, ...)
 	endfor
 endfunction
 
+
+function s:Autoname(pat)
+	" TODO remove this
+	let s:autonum += 1
+	return printf(a:pat, s:autonum)
+endfunction
 
 function jhv#mappings#Repeatable(...)
 	let settingnames = ['makemap', 'mode', 'name', 'repeat', 'transition', 'verbose', 'SID']

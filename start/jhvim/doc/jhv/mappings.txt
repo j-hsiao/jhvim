@@ -3,10 +3,14 @@
 Mappings sees maps as 2 types: keymaps and action maps.
 key maps~
 These map keys to a sequence of actions.  {lhs} will be prefixed with >
-  <Plug>tree:treename;
+  <Plug>jhvtree:treename;keys
 or nothing, if no tree.  The {rhs} will be a concatenation of action map
-{lhs}s.  This structure allows easy management of actions per key map.
-Because the keymap activates action maps, it MUST be recursive.
+{lhs}s.  That is to say, {rhs} should look like >
+  <Plug>jhvmap:treename:name:0;<Plug>jhvmap:treename:name:1;...
+This structure allows easy management of actions per key map.
+Because the keymap activates action maps, it MUST be recursive.  If any key
+map does not follow this pattern, normalization consists of creating an action
+map and then remapping the keymap to the corresponding action map.
 
 action maps~
 Action maps have {lhs} of the form: >
@@ -18,23 +22,74 @@ explicit escaping.  uniq is a unique string, currently implemented as an
 incremented number.
 
 Map trees~
-Maps are further grouped into "trees".  Mappings in a tree are key maps
-prefixed with >
-  <Plug>tree:treename;
-As a result, they are all |map-ambiguous| with eachother and branch out from
-the same tree.  Trees thus act similarly to a namespace.  If the tree name is
-empty, this is like a global namespace, and in this case, the prefix is empty.
+Maps are grouped into "trees".  A tree consists of all mappings that begin
+with the common prefix >
+  <Plug>jhvtree:treename;
+This includes all keymaps as well as the base keymap where keys is empty.
+As a result, All mappings in a tree are |map-ambiguous| with each other.
 
-The prefix itself is a mapping that maps to nothing if any key is ready and
-otherwise, maps back to itself.  This allows vim to remain in the tree,
-waiting for some tree action.  Most keymaps end with the prefix as well so
-that other tree actions can be performed.  The empty tree does not need this
-map.
+The base keymap has no extra keys.  This map consists of only the prefix.
+It is generally activated by default after 'timeout' and is designed in
+such a way that it will continually activate itself.  The 'timeout' prevents
+instant infinite recursion and allows sitting in a tree waiting for the next
+keypress.
+
+NOTE: 'timeout' is used to wait instead of something like |getchar()| because
+|getchar()| moves the cursor into the statusline.  'timeout' does not, which
+lets the user see where the cursor currently is while they decide what to
+press next.
+
+NOTE: the empty tree (no treename) acts like a global namespace and does not
+have a base keymap.
+
+Generally, RHS of all branches should also end with the common prefix.  This
+allows activation of branch mappings by only typing the corresponding keys
+without the prefix.  This gives behavior similar to a mode, where while
+waiting on the prefix, for map disambiguation, tree branch maps can be taken.
+After leaving the tree, the corresponding maps can no longer be activated by
+their assigned key until after re-entering the tree (by typing the prefix).
+
+entry maps~
+Because the prefix starts with <Plug>, there is no "normal" way to enter the
+tree.  Entry into the tree is generally done through entry maps.  These are
+mappings of the form >
+  *map <special> {lhs} <Plug>jhvtree:treename;keys
+where {lhs} is some mapping without any <Plug>.  This gives the entire {lhs}
+of a keymap which, as described above, should end with the tree prefix thus
+performing the corresponding action and enterring the tree.
+
+===Example===
+Repeating mappings.
+The repeat key (. by default) generally only repeats the previous subaction.
+There is no native way to repeat an entire mapping.  However, keymaps and
+trees can be used to create this behavior.
+
+Suppose there is a tree named repeat.  The desired repeat key is <Space>.
+Activate the map from outside the tree with <Leader>asdf
+There is a base mapping: >
+  *map <special> <Plug>jhvtree:repeat; {generated rhs}
+a key map: >
+  *map <special> <Plug>jhvtree:repeat;<Space>
+  \ <Plug>jhvmap:repeat:myaction:0;<Plug>jhvtree:repeat;
+an action map: >
+  *map <special> <Plug>jhvmap:repeat:myaction:0;  dosomething
+an entry map: >
+  *map <special> <Leader>asdf <Plug>jhvtree:repeat;<Space>
+
+When the user activates the entry map, the mapping expands to the keymap
+{lhs}.  Because this is also recursive, it expands to the action map (and does
+the action) followed by the tree prefix.  At this point, if 'timeout', then
+the base mapping will just keep activating itself.  A single <Space> press
+resolves to the keymap which again does the action and re-enters the tree.
+When a different key is pressed, then the base mapping gets resolved to
+nothing and the key does whatever it would normally do outside of any tree.
+In this way, the {rhs} of the action map can be repeated with a single press
+of <Space>.
 
 
 ===User Commands===
-The user commands wrap the corresponding function and pass arguments directly
-to them.
+The user commands are provided as more convenient was to call the
+corresponding function.
 
 command     function
 *:CopyMap*    |jhv#mappings#Copymap()|
@@ -44,8 +99,10 @@ command     function
 
 ===Functions===
 						*jhv#mappings#CopyMap()*
-|jhv#mappings#CopyMap(|mode, lhs, newlhs)
+|jhv#mappings#CopyMap(|mode, lhs, newlhs[, dict])
 Copy the current mapping to {lhs} in the given mode to a {newlhs}.
+dict can be provided as the result of |maparg(|lhs, mode, 0, 1) if the dict was
+already calculated.  Otherwise, |maparg()| will be called.
 
 						*jhv#mappings#ExtendMap()*
 |jhv#mappings#ExtendMap(|...)
@@ -194,32 +251,14 @@ Mapping 4 just maps to mapping 1 after %(transition) to put vim back into the
 jhv#mappings#Tmap(treename, ...)
 Manage a tree of mappings.
 
-Arguments are parsed with |jhv#parse#Settings()|.
+Arguments are parsed with |jhv#parse#Settings()| except the first argument
+which should be the name of the tree to use.  Besides the settings, TMap takes
+a mapping and interprets it as a mapping of a tree.  An action map to the
+{rhs} is created and the action is added to the keymap created from {lhs}.
+If the base tree map does not already exist, it will be created.  Lastly,
+depending on settings, an entry map might be created to perform the {rhs}
+action and enter the tree.
 
-A tree of mappings consists of 4 types of mappings:
-1. A "wait" mapping to remain in the tree. "<Plug>Tmap:treename;" It evaluates
-   to nothing if a key is ready.  Otherwise it reactivate itself.
-2. Action map that does the action.  This is a separate mapping to allow nore
-   mappings.  The other mappings will generally call this mapping via {LHS}.
-3. Activation maps.  This would usually call a type2 mapping followed by the
-   type1 mapping.  Its {LHS} is usually more complicated than the
-   corresponding type4 mapping.  These mappings are the main way to enter the
-   tree.
-4. Similar to a type3 mapping, these mappings have {LHS} which is the type1
-   mapping followed by the {LHS} of the provided map command.  The resulting
-   behavior is creating a map that can only be activated when the tree is
-   active.
-5. Same as a type2 mapping, except for the entry action if it differs
-   significantly from the {RHS} of the provided map command.  (if erhs,
-   rpre, or rpost, are provided)
-
-* Type1 mappings are only created once.
-* Type2 mappings are created with the provided map command.  Replace the {LHS}
-  with "<Plug>Tmap_do:treename:name" where name defaults to >
-    substitute({RHS} '[[:blank:]]', '_', 'g')
-* Type3 mappings have {LHS} match the provided map command by default.
-  Use the enter setting to change the {LHS}
-* Type4 have {LHS} match the provided map command and call other map types.
 
 settings:
   * name: |str|, name of the action.  Default to <Plug>do:{RHS}
