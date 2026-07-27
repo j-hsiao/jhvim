@@ -33,11 +33,12 @@ function jhv#vsearch#NoteSearch()
 	" Allow N to also be X to indicate un-set numbering
 	" It should be surrounded by some kind of barrier
 	" usually ---- or =====
+	"
 
 	let curline = getline('.')
 	let curcol = col('.') - 1
 	let idx = 0
-	let pattern = '\m\(.\{-0,}\)\(-[0-9xX]\+\%(\.[0-9xX]\+\)*-\)'
+	let pattern = '\m\(.\{-0,}\)\([^[:alnum:][:blank:]]\%([0-9]\+\|[xX]\)\%(\.\%([0-9]\+\|[xX]\)\)*\%([^[:alnum:].]\|$\)\)'
 	let result = matchlist(curline, pattern, 0)
 	let best = len(curline)
 	let target = ''
@@ -62,8 +63,7 @@ function jhv#vsearch#NoteSearch()
 	if len(target)
 		let pattern = join([
 			\ '\m^[[:blank:]]*\(.\)\1*\_$\_.',
-			\ '\_^[[:blank:]]*\V', target], '')
-		echom pattern
+			\ '\_^[[:blank:]]*\V', escape(target, '\/')], '')
 		return search(pattern, 's') . 'zt'
 
 		"return join([
