@@ -17,10 +17,20 @@ if maparg('<C-[><C-[>') == ''
 	nnoremap <C-[><C-[> :nohl<CR>
 endif
 
+" Easier rightward deletion without reaching for del.
+if maparg("\<C-L>", 'i') == ''
+	inoremap <silent> <C-L> <Del>
+endif
+
 "scratch buffer
 if maparg('<Leader>b', 'n') == ''
 	nnoremap <Leader>b :enew<CR>:setlocal buftype=nofile bufhidden=hide noswapfile<CR>
 endif
+
+"Preserve a mapping to original <Leader>
+"if maparg('<Leader><Leader>', 'i') == ''
+"	execute jhsiaomapfallback#CreateFallback('<Leader><Leader>', '<Leader>', 'i')
+"endif
 
 " Formatting width.
 function s:FitWidth(...)
@@ -54,11 +64,6 @@ nnoremap <expr> j v:count == v:count1 ? printf("m'%sj", v:count) : 'j'
 nnoremap <expr> k v:count == v:count1 ? printf("m'%sk", v:count) : 'k'
 
 
-" TODO comments, but that probably goes to a different file
-" TODO surround
-" TODO formatting header
-"
-"
 "On windows, wt, (but not while in tmux) in insert mode,
 "<C-[>O followed by some keys leads to odd behavior.  However, adding inoremap
 "seems to avoid the behavior.  vim -u NONE seems to not have this behavior
