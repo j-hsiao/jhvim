@@ -252,7 +252,7 @@ jhv#mappings#Tmap(...)
 Manage a tree of mappings.
 
 Arguments are parsed with |jhv#parse#Settings()| except the first argument
-which should be the name of the tree to use.  Besides the settings, TMap takes
+which should be the name of the tree to use.  Besides the settings, Tmap takes
 a mapping and interprets it as a mapping of a tree.  An action map to the
 {rhs} is created and the action is added to the keymap created from {lhs}.
 If the base tree map does not already exist, it will be created.  Lastly,

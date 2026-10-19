@@ -57,7 +57,7 @@ function jhv#parse#Settings(settings, ...)
 			endif
 			let idx = 0
 			while idx < len(substr)
-				let settingmatch = matchlist(substr, '\m^[[:blank:]]*\([a-zA-Z_][a-zA-Z0-9_]*\)=\(\%(\\.\|[^[:blank:]]\)*\)\%([[:blank:]]\+\|$\)', idx)
+				let settingmatch = matchlist(substr, '\m^[[:blank:]]*\([[:alpha:]_][[:alnum:]_]*\|\)=\(\%(\\.\|[^[:blank:]]\)*\)\%([[:blank:]]\+\|$\)', idx)
 				if empty(settingmatch)
 					let settingmatch = matchlist(substr, '\m^[[:blank:]]*\(<SNR>[0-9]\+_\)\%([[:blank:]]\+\|$\)', idx)
 					if empty(settingmatch)

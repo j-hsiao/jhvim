@@ -177,6 +177,10 @@ function jhv#mappings#Tmap(...)
 		\ 'tree', '', 'enter', 'target', 'SID', 'verbose', 'keep', 'add']
 
 	let [settings, mapcmd] = call('jhv#parse#Settings', extend([settingnames], a:000))
+	if empty(settings)
+	endif
+	echom settings
+	echom mapcmd
 	let tree = get(settings, 'tree', get(settings, '', ''))
 	let treename = s:Name(tree)
 	if get(settings, 'verbose', v:false)
