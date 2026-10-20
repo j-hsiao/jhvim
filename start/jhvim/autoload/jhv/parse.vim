@@ -19,8 +19,7 @@ function jhv#parse#Settings(settings, ...)
 	let wordpat = join([
 		\ '\m^[[:blank:]]*\([[:alpha:]_][[:alnum:]_]*\|\)=',
 		\ '\(\%(',
-			\ '\\.',
-			\ '\|"\%(\\.\|[^"]\)*"',
+			\ '"\%(\\.\|[^"]\)*"',
 			\ '\|', "'[^']*'",
 			\ '\|[^[:blank:]]',
 		\ '\)*\)',
@@ -50,11 +49,18 @@ function jhv#parse#Settings(settings, ...)
 					endif
 				endif
 				if empty(valid) || has_key(ret, settingmatch[1]) || index(valid, settingmatch[1]) >= 0 || settingmatch[1] == 'SID'
-					let value = substitute(settingmatch[2], '\m\\\(.\)', '\1', 'g')
-					try
-						let value = json_decode(value)
-					catch
-					endtry
+					if match(settingmatch[2], "\\m^'[^']*'$") >= 0
+						let value = settingmatch[2][1:-2]
+					else
+						let value = settingmatch[2]
+						try
+							let value = json_decode(value)
+							if value == v:none
+								let value = ''
+							endif
+						catch
+						endtry
+					endif
 					let ret[settingmatch[1]] = value
 					let idx += len(settingmatch[0])
 				else

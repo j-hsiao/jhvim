@@ -30,6 +30,8 @@ clashes.
 list: add valid setting names.  No given names means all are valid.
 dict: Add settings.  Overrides any already-parsed settings.
 str: Strings containing "name=value ..." to parse as settings.
+     value can be a json-like object string (but no unquoted spaces) or
+     a single-quoted string.
 
 Return [settings, remainder] where settings is a dict of parsed settings
 and remainder is the concatenation of remaining strings after the first
