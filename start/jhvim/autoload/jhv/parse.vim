@@ -45,6 +45,17 @@ function jhv#parse#Settings(settings, ...)
 		let ret = a:settings
 		let valid = []
 	endif
+	let wordpat = join([
+		\ '\m^[[:blank:]]*\([[:alpha:]_][[:alnum:]_]*\|\)=',
+		\ '\(\%(',
+			\ '\\.',
+			\ '\|"\%(\\.\|[^"]\)*"',
+			\ '\|', "'[^']*'",
+			\ '\|[^[:blank:]]',
+		\ '\)*\)',
+		\ '\%([[:blank:]]\+\|$\)',
+		\ ],
+		\ '')
 	for substr in a:000
 		if type(substr) == v:t_list
 			call extend(valid, substr)
@@ -57,7 +68,7 @@ function jhv#parse#Settings(settings, ...)
 			endif
 			let idx = 0
 			while idx < len(substr)
-				let settingmatch = matchlist(substr, '\m^[[:blank:]]*\([[:alpha:]_][[:alnum:]_]*\|\)=\(\%(\\.\|[^[:blank:]]\)*\)\%([[:blank:]]\+\|$\)', idx)
+				let settingmatch = matchlist(substr, wordpat, idx)
 				if empty(settingmatch)
 					let settingmatch = matchlist(substr, '\m^[[:blank:]]*\(<SNR>[0-9]\+_\)\%([[:blank:]]\+\|$\)', idx)
 					if empty(settingmatch)
