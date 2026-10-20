@@ -102,7 +102,8 @@ command     function
 |jhv#mappings#CopyMap(|mode, lhs, newlhs[, dict])
 Copy the current mapping to {lhs} in the given mode to a {newlhs}.
 dict can be provided as the result of |maparg(|lhs, mode, 0, 1) if the dict was
-already calculated.  Otherwise, |maparg()| will be called.
+already calculated.  Otherwise, |maparg()| will be called.  If there is no
+mapping to copy, then create a non-recursive mapping from {newlhs} to {lhs}.
 
 						*jhv#mappings#ExtendMap()*
 |jhv#mappings#ExtendMap(|...)
@@ -262,7 +263,8 @@ action and enter the tree.
 
 settings:
   * tree: |str|, name of the tree.  As an alternative, the "tree=name" can be
-    shortened to "=name" to specify the tree name.
+    shortened to "=name" to specify the tree name.  If the first argument is
+    not a "setting=value", then it is assumed to be the tree name.
   * enter: |str|, "[*[nore]map] [{lhs}] [{rhs}]".  If non-empty, then this is
     used to create an entry map.  the mapcmd and lhs will be taken from the
     main mapping if omitted.  rhs defaults to empty and will be used as a
@@ -284,6 +286,8 @@ settings:
   * keep: bool, keep the existing keypresses if a map does not already exist.
   * add: |str|, <: add action before, >: add action after, =: replace existing
     action.  Default is =.
+  * name: |str| A name for the action.  If omitted, then use LHS.
+  * extend: |int| 0: overwrite, 1: add action before, 2: add action after
 
 NOTE
 types 4 and 1 must be in the same map mode.

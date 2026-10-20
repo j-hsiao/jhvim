@@ -20,32 +20,32 @@ else
 	let s:noop = '<Bslash><lt>Ignore>'
 endif
 
-function s:Map2Estr(mpcmd, ...)
-	if a:0
-		let quoteit = a:1
-	else
-		let quoteit = 1
-	endif
-	" from :h key-notation
-	let subs = [
-		\ '<Nul>', '<BS>', '<Tab>', '<NL>', '<CR>', '<Return>', '<Enter>',
-		\ '<Esc>', '<Space>', '<lt>', '<Bslash>', '<Bar>', '<Del>', '<CSI>',
-		\ '<xCSI>', '<EOL>', '<Up>', '<Down>', '<Left>', '<Right>', '<S-Up>',
-		\ '<S-Down>', '<S-Left>', '<S-Right>', '<C-Left>', '<C-Right>',
-		\ '<\%(S-\)\?F[1-9][0-2]\?>', '<Help>', '<Undo>', '<Insert>', '<Home>',
-		\ '<End>', '<PageUp>', '<PageDown>', '<kHome>', '<kEnd>', '<kPageUp>',
-		\ '<kPageDown>', '<kPlus>', '<kMinus>', '<kMultiply>', '<kDivide>',
-		\ '<kEnter>', '<kPoint>', '<k[0-9]>', '<S-[^>]\+>', '<C-[^>]\+>', '<M-[^>]\+>',
-		\ '<A-[^>]\+>', '<D-[^>]\+>', '<t_[^>]\+>', '<Plug>', '<Cmd>', '<Ignore>'
-	\ ]
-	let ret = substitute(escape(a:mpcmd, '\"'), printf('\m\(%s\)', join(subs, '\|')), '\\\1', 'g')
-	if quoteit
+" Convert a string as would be typed in a vim script specifying an map
+" command into an appropriate string that could be eval()ed inside
+" double quotes.
+" from :h key-notation
+let s:keynotation = printf('\m\(\\\|"\|<\%%(%s\)>\)',
+	\ join([
+		\ 'Nul', 'BS', 'Tab', 'NL', 'CR', 'Return', 'Enter',
+		\ 'Esc', 'Space', 'lt', 'Bslash', 'Bar', 'Del', 'CSI',
+		\ 'xCSI', 'EOL', 'Up', 'Down', 'Left', 'Right', 'S-Up',
+		\ 'S-Down', 'S-Left', 'S-Right', 'C-Left', 'C-Right',
+		\ '\%(S-\)\?F[1-9][0-2]\?', 'Help', 'Undo', 'Insert', 'Home',
+		\ 'End', 'PageUp', 'PageDown', 'kHome', 'kEnd', 'kPageUp',
+		\ 'kPageDown', 'kPlus', 'kMinus', 'kMultiply', 'kDivide',
+		\ 'kEnter', 'kPoint', 'k[0-9]', 'S-[^>]\+', 'C-[^>]\+', 'M-[^>]\+',
+		\ 'A-[^>]\+', 'D-[^>]\+', 't_[^>]\+', 'Plug', 'Cmd', 'Ignore'
+	\], '\|'))
+function s:AsEval(mpcmd, ...)
+	let ret = substitute(a:mpcmd, s:keynotation, '\\\1', 'g')
+	if !a:0 || a:1
 		return printf('"%s"', ret)
 	endif
 	return ret
 endfunction
 
-function s:Str2Map(mpstr)
+"Convert some literal characters into <> notation.
+function s:AsKeyNotation(mpstr)
 	let ret = a:mpstr
 	for [seq, replace] in [
 		\ ['<', '<lt>'],
@@ -61,11 +61,11 @@ function s:Str2Map(mpstr)
 endfunction
 
 "for debugging...
-function jhv#mappings#Map2Estr(...)
-	return call('s:Map2Estr', a:000)
+function jhv#mappings#AsEval(...)
+	return call('s:AsEval', a:000)
 endfunction
-function jhv#mappings#Str2Map(...)
-	return call('s:Str2Map', a:000)
+function jhv#mappings#AsKeyNotation(...)
+	return call('s:AsKeyNotation', a:000)
 endfunction
 
 function s:Name(lhs)
@@ -74,35 +74,37 @@ function s:Name(lhs)
 endfunction
 
 let s:autonum = 0
-function s:Actionmap(treename, keyname)
+function s:ActionLHS(treename, actionname)
 	" Generate an actionmap LHS.
 	let s:autonum += 1
-	return printf('<Plug>jhvaction:%s:%s:%d;', a:treename, a:keyname, s:autonum)
+	return printf('<Plug>jhvaction:%s:%s:%d;', a:treename, a:actionname, s:autonum)
 endfunction
 
-function s:Treemap(treename)
-	"Return the LHS for a keymap"
-	if empty(a:tree)
+function s:TreeLHS(treename)
+	"Return the base tree map LHS
+	if empty(a:treename)
 		return ''
 	else
 		return printf('<Plug>jhvtree:%s;', a:treename)
 	endif
 endfunction
 
-function s:MakeTree(treemap, mode)
-	" Create the base keymap for the tree.
-	if empty(a:treemap)
+function s:MakeTree(lhs, mode)
+	" Create the an exec string to create a base tree map.
+	" It should repeatedly call itself until a key is pressed.
+	if empty(a:lhs)
 		return ''
 	endif
-	if len(maparg(treemap, a:mode))
+	if len(maparg(a:lhs, a:mode))
 		return ''
 	endif
 	return printf(
 		\ '%smap <special> <silent> <expr> %s getchar(1) ? "" : "%s%s"',
-		\ a:mode, treemap, s:noop, jhv#mappings#Str2Map(jhv#mappings#Map2Estr(treemap, 0)))
+		\ a:mode, a:lhs, s:noop, s:AsKeyNotation(s:AsEval(a:lhs, 0)))
 endfunction
 
 function s:MapSet(dct)
+	" Set a mapping from a dict (like from maparg(...))
 	" NOTE It seems like nmap ...
 	" to search for mappings uses the 'lhsraw' entry to the dict.
 	" However, if I just use "\<C-K>" as the lhsraw, then nmap will not find
@@ -140,20 +142,20 @@ function jhv#mappings#CopyMap(mode, lhs, newlhs, ...)
 		execute printf('%snoremap %s %s', a:mode, a:newlhs, a:lhs)
 	else
 		let dct['lhs'] = a:newlhs
-		let dct['lhsraw'] = eval(jhv#mappings#Map2Estr(a:newlhs))
 		call s:MapSet(dct)
 	endif
 endfunction
 
-function s:NormalizeKeymap(treename, mode, lhs, keep)
-	"Return [lhs, rhs, target] for a normalized keymap.
-	"If keep, then keep the action even if there is no mapping.
-	let treemap = s:Treemap(a:treename)
+function s:NormalizeKeymap(treename, mode, lhs, keep, name)
+	"Return [lhs, actions, rep] for a normalized key mapping.
+	"If keep, when there is no original mapping,
+	"the raw nonrecursing lhs is used as the corresponding action.
+	let treemap = s:TreeLhs(a:treename)
 	let lhs = treemap . a:lhs
 	let mdict = maparg(lhs, a:mode, 0, 1)
 	if empty(mdict)
 		if a:keep
-			let action = s:Actionmap(a:treename, s:Name(a:lhs))
+			let action = s:ActionLHS(a:treename, s:Name(a:lhs))
 			exec printf('%snoremap <special> %s %s', a:mode, action, a:lhs)
 			return [lhs, action, treemap]
 		else
@@ -162,7 +164,7 @@ function s:NormalizeKeymap(treename, mode, lhs, keep)
 	else
 		let parsed = matchlist(mdict['rhs'], '\m^\(\%(<Plug>jhvaction:[^:;]*:[^:;]*:[^:;]*;\)*\)\(<Plug>jhvtree:[^:;]*;\)\?$' )
 		if empty(parsed)
-			let action = s:Actionmap(a:treename, s:Name(a:lhs))
+			let action = s:ActionLHS(a:treename, s:Name(a:lhs))
 			jhv#mappings#CopyMap(a:mode, lhs, action, mdict)
 			return [lhs, action, treemap]
 		else
@@ -174,13 +176,17 @@ endfunction
 
 function jhv#mappings#Tmap(...)
 	let settingnames = [
-		\ 'tree', '', 'enter', 'target', 'SID', 'verbose', 'keep', 'add']
-
+		\ 'tree', '', 'enter', 'target', 'SID', 'verbose', 'keep',
+		\ 'add', 'name', 'extend'
+	]
 	let [settings, mapcmd] = call('jhv#parse#Settings', extend([settingnames], a:000))
 	if empty(settings)
+		echom 'prefixing tree'
+		let rawtree = extend([settingnames], a:000)
+		let rawtree[1] = substitute(rawtree[1], '\m^[[:space:]]*\(.*\)', 'tree=\1', '')
+		let [settings, mapcmd] = call('jhv#parse#Settings', rawtree)
 	endif
-	echom settings
-	echom mapcmd
+
 	let tree = get(settings, 'tree', get(settings, '', ''))
 	let treename = s:Name(tree)
 	if get(settings, 'verbose', v:false)
@@ -199,14 +205,15 @@ function jhv#mappings#Tmap(...)
 	if match(rhs, '\m[[:blank:]]\(s:\|<SID>\)[a-zA-Z0-9_]') >= 0
 		echohl WarningMsg | echom 'WARNING: Tmap <SID> was not replaced' | echohl None
 	endif
+
 	let maps = []
-	let treemap = s:Treemap(treename)
-	let keyname = s:Name(lhs)
+	let treemap = s:TreeLhs(treename)
+	let actionname = s:Name(get(settings, 'name', lhs))
 	call add(maps, s:MakeTree(treemap, mapmode))
 	if empty(rhs) || rhs == '<Nop>'
 		let action = ''
 	else
-		let action = s:Actionmap(treename, keyname)
+		let action = s:ActionLHS(treename, actionname)
 		call add(maps, printf('%s <special> %s %s %s', mapcmd, mapargs, action, rhs))
 	endif
 	let [keymap, keyactions, keytarget] = s:NormalizeKeymap(
@@ -216,7 +223,7 @@ function jhv#mappings#Tmap(...)
 		if empty(target)
 			let target = keytarget
 		else
-			let target = s:Treemap(s:Name(target))
+			let target = s:TreeLhs(s:Name(target))
 		endif
 	else
 		let target = ''
@@ -243,7 +250,7 @@ function jhv#mappings#Tmap(...)
 		if empty(erhs)
 			let eaction = ''
 		else
-			let eaction = s:Actionmap(treename, keyname)
+			let eaction = s:ActionLHS(treename, actionname)
 			call add(maps, printf('%s <special> %s %s%s', ecmd, elhs, erhs))
 		endif
 		call add(maps, printf('%smap <special> %s %s%s%s', emode, elhs, eaction, treemap, lhs))
@@ -317,7 +324,7 @@ function jhv#mappings#Repeatable(...)
 	" reproduce this behavior.
 	let wtmap = printf(
 		\ '%smap <silent> <special> <expr> %s getchar(1) ? "" : ("%s%s")',
-		\ mode, waitname, s:noop, jhv#mappings#Str2Map(jhv#mappings#Map2Estr(waitname, 0)))
+		\ mode, waitname, s:noop, s:AsKeyNotation(s:AsEval(waitname, 0)))
 	if empty(transition)
 		if mode != mapmode
 			if mode == 'n'
@@ -426,7 +433,7 @@ function jhv#mappings#ExtendMap(...)
 	else
 		if mapdict['expr']
 			let sep = ' . '
-			let plugname = jhv#mappings#Str2Map(jhv#mappings#Map2Estr(plugname))
+			let plugname = s:AsKeyNotation(s:AsEval(plugname))
 		else
 			let sep = ''
 		endif
