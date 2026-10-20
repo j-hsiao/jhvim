@@ -19,22 +19,6 @@ Return list with the following groups on success.
    6. rhs
    7... ignored
 
-							*jhv#parse#PreArgs()*
-jhv#parse#PreArgs(cmd[, startidx[, asjson]])
-Parse "name=value" arguments at beginning of a:cmd.
-
-cmd: |string|, A string of the command to parse.
-startidx=0: |integer|, starting index to begin parsing.
-asjson=1: |Boolean|, "value" is parsed as json. Leave as a |string| if failed.
-
-Return [args, idx] where args is a dict of {name: value} and idx is the index
-of the first argument that does not match "name=value".
-
-Backslashes escape the next character.  Arguments are split by unescaped
-whitespace.  Additionally any token that is simply "<SNR>[0-9]+_" will be
-assumed to be the result of |expand(|"<SID>") and be treated as if prefixed
-with "SID=" (assigned in the dict as "SID": "...").
-
 							*jhv#parse#Settings()*
 jhv#parse#Settings(settings,...)
 Parse settings arguments.
@@ -49,7 +33,10 @@ str: Strings containing "name=value ..." to parse as settings.
 
 Return [settings, remainder] where settings is a dict of parsed settings
 and remainder is the concatenation of remaining strings after the first
-argument that does not match "name=value"
+argument that does not match "name=value".
+
+As a special case, any match for '<SNR>[0-9]\+_' prior to the first
+non-setting argument will be treated as the value for a 'SID=...' setting.
 
 						*jhv#parse#ParseComments()*
 jhv#parse#ParseComments()

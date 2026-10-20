@@ -7,35 +7,6 @@ function jhv#parse#Mapping(commandline, ...)
 		\ start, cnt)
 endfunction
 
-function jhv#parse#PreArgs(str, ...)
-	let idx = get(a:000, 0, 0)
-	let json = get(a:000, 1, 1)
-	let settings = []
-	while idx < len(a:str)
-		let settingmatch = matchlist(a:str, '\m^[[:blank:]]*\([a-zA-Z_][a-zA-Z0-9_]*\)=\(\%(\\.\|[^[:blank:]]\)*\)\%([[:blank:]]\+\|$\)', idx)
-		if empty(settingmatch)
-			let settingmatch = matchlist(a:str, '\m^[[:blank:]]*\(<SNR>[0-9]\+_\)\%([[:blank:]]\+\|$\)', idx)
-			if empty(settingmatch)
-				break
-			else
-				call add(settings, ['SID', settingmatch[1]])
-				let idx += len(settingmatch[0])
-			endif
-		else
-			let value = substitute(settingmatch[2], '\m\\\(.\)', '\1', 'g')
-			if json
-				try
-					let value = json_decode(value)
-				catch
-				endtry
-			endif
-			call add(settings, [settingmatch[1], value])
-			let idx += len(settingmatch[0])
-		endif
-	endwhile
-	return [settings, idx]
-endfunction
-
 function jhv#parse#Settings(settings, ...)
 	let remainder = []
 	if type(a:settings) == v:t_list
@@ -78,7 +49,7 @@ function jhv#parse#Settings(settings, ...)
 						let settingmatch = [settingmatch[0], 'SID', settingmatch[1]]
 					endif
 				endif
-				if empty(valid) || has_key(ret, settingmatch[1]) || index(valid, settingmatch[1]) >= 0
+				if empty(valid) || has_key(ret, settingmatch[1]) || index(valid, settingmatch[1]) >= 0 || settingmatch[1] == 'SID'
 					let value = substitute(settingmatch[2], '\m\\\(.\)', '\1', 'g')
 					try
 						let value = json_decode(value)
