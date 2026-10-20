@@ -58,44 +58,39 @@ where {lhs} is some mapping without any <Plug>.  This gives the entire {lhs}
 of a keymap which, as described above, should end with the tree prefix thus
 performing the corresponding action and enterring the tree.
 
-===Example===
-Repeating mappings.
+===Example: Repeating mappings.===
 The repeat key (. by default) generally only repeats the previous subaction.
-There is no native way to repeat an entire mapping.  However, keymaps and
-trees can be used to create this behavior.
+There is no native way to repeat an entire mapping.  Use a treemap to
+attain this behavior.
 
-Suppose there is a tree named repeat.  The desired repeat key is <Space>.
-Activate the map from outside the tree with <Leader>asdf
-There is a base mapping: >
-  *map <special> <Plug>jhvtree:repeat; {generated rhs}
-a key map: >
-  *map <special> <Plug>jhvtree:repeat;<Space>
-  \ <Plug>jhvaction:repeat:myaction:0;<Plug>jhvtree:repeat;
-an action map: >
-  *map <special> <Plug>jhvaction:repeat:myaction:0;  dosomething
-an entry map: >
-  *map <special> <Leader>asdf <Plug>jhvtree:repeat;<Space>
+Desired mapping: <Leader>asdf
+Desired repeat key: <Space>
 
-When the user activates the entry map, the mapping expands to the keymap
-{lhs}.  Because this is also recursive, it expands to the action map (and does
-the action) followed by the tree prefix.  At this point, if 'timeout', then
-the base mapping will just keep activating itself.  A single <Space> press
-resolves to the keymap which again does the action and re-enters the tree.
-When a different key is pressed, then the base mapping gets resolved to
-nothing and the key does whatever it would normally do outside of any tree.
-In this way, the {rhs} of the action map can be repeated with a single press
-of <Space>.
+1. Pick a name for the tree (here we choose "repeat")
+2. Add an action map >
+	nnoremap <Plug>jhvaction:repeat:myaction:##; {rhs}
+3. Add a tree map <Plug>jhvtree:repeat;
+4. Add a key map: >
+	nmap <Plug>jhvtree:repeat;<Space>
+	\ <Plug>jhvaction:repeat:myaction:##;<Plug>jhvtree:repeat;
+5. Add an entry map: >
+	nmap <Leader>asdf <Plug>jhvtree:repeat;<Space>
 
+From normal mode, the user can activate the mapping with <Leader>asdf which
+recursively activates the key map.  The keymap activates the action map
+performing whatever action was desired and then enters the "repeat" tree.
+On the next press of <Space> it is disambiguated into the keymap which
+activates the action and then enters the "repeat" tree again.  On a different
+keypress, the tree is disambiguated as a no-op and the new key is interpreted
+by itself.
 
 ===User Commands===
-The user commands are provided as more convenient was to call the
+The user commands are provided as more convenient ways to call the
 corresponding function.
 
 command     function
 *:CopyMap*    |jhv#mappings#Copymap()|
-*:ExtendMap*  |jhv#mappings#ExtendMap()|
-*:Repeatable* |jhv#mappings#Repeatable()|
-*:Tmap*       |jhv#mappings#Tmap()|
+*:TMap*       |jhv#mappings#TMap()|
 
 ===Functions===
 						*jhv#mappings#CopyMap()*
@@ -105,171 +100,26 @@ dict can be provided as the result of |maparg(|lhs, mode, 0, 1) if the dict was
 already calculated.  Otherwise, |maparg()| will be called.  If there is no
 mapping to copy, then create a non-recursive mapping from {newlhs} to {lhs}.
 
-						*jhv#mappings#ExtendMap()*
-|jhv#mappings#ExtendMap(|...)
-Add a mapping to the beginning or end of an existing mapping.
-Arguments are strings that are concatenated together.  The final string should
-look like >
-    [setting=value]... *map <map-args> {lhs} {rhs}
-Settings~
-	before: bool=v:false, the new {rhs} should go before the original.
-	keep: bool=v:false, Keep the lhs if no prior mapping.
-	name: a name, defaults to {lhs}
-	rep: bool=v:true, Handle |:Repeatable| mappings.
-	SID: pass |expand(|'<SID>') to allow use of <SID> in {rhs}.
-	verbose: bool=v:false, echom info
 
-Implementation~
-The {rhs} mappings will be assigned to an intermediate generated {lhs}.  This
-intermediate mapping allows the user to freely use various `map-arguments`.
-The generated intermediate {lhs} are concatenated and used as {rhs} for the
-actual mapping bound to the desired {lhs}.  If the existing mapping is nore,
-then the existing mapping is first mapped using a newly generated {lhs}.
-This means there are 2 generated {lhs} (one for the original and one for the
-current) which will be concatenated into the {rhs} for the mapping.
+							*jhv#mappings#TMap()*
+jhv#mappings#TMap(...)
+Add mappings to a tree.
 
-Generated {lhs} have the form "<Plug>ExtendMap:%(mapmode):%(count):%(name)"
-where mapmode is the map prefix (ex. "i" for "imap", "" for "map"), count
-is just an incremented counter to ensure the generated {lhs} does not yet
-have an existing mapping, and name is the name setting.
-
-Example~
-Commands: >
-	nnoremap doit :echo "doit"<CR>
-	ExtendMap nnoremap doit :echo "I did it!"<CR>
-<possible result: >
-	nnoremap <Plug>ExtendMap:%(mapmode):%(count):%(name); :echo "doit"<CR>
-	nnoremap <Plug>ExtendMap:%(mapmode):%(count):%(name); :echo "I did it!"<CR>
-	nmap doit <Plug>ExtendMap:...;<Plug>ExtendMap:...;
-<
-Interaction with :Repeatable~
-If the rep setting is v:true, then handle calculate the {lhs} of Mapping 2 of
-the |:Repeatable| maps and extend that.  This way, the newly added {rhs} will
-be repeated together with whatever was originally the {rhs}
-
-						*jhv#mappings#Repeatable()*
-This function creates the set of mappings to have repeatable mapping behavior.
-It takes a single string argument of the form: >
-	[setting=value ...] [<SNR>D_] *map [<map-args>...] {lhs} {rhs}
-<If given multiple strings, they will effectively be |join()|ed with a single
-space.
-
-The string will be split into arguments which are sequences of non- whitespace
-characters.  Any character following a backslash will be treated as part of an
-argument.  Arguments will be parsed as settings from left to to right until
-the first argument that does not match the setting=value pattern.
-
-An exception is if the argument matches '<SNR>[0-9]\+_', in which case this is
-assumed to be the value of `expand(`"<SID>") and is treated as the value of an
-'SID=value' argument.  This allows specifying SID without the need for string
-formatting or concatenation.
-
-Setting values are decoded as JSON if possible and used as is otherwise.
-
-The remaining text after the setting arguments is the raw map command.  Once
-{rhs} is detected, there will be no more argument splitting and any whitespace
-will be treated as part of the {rhs} argument.
-
-settings~
-	makemap: |Boolean| Create the main mapping and return "".  Otherwise,
-		return a string with the mapping command for the user to |:exec|.
-	mode: |string| the mode after the intial mapping.  Default to the
-		* in *[nore]map, which is the map command used.
-	name: |string| name for the mapping, which should be unique.
-		Default to {lhs}.
-	repeat: |string|, the key (sequence) to press to repeat the mapping.
-		Defaults to "."
-	SID: |string| Perform a simple substitution on any <SID> found in the
-		mapping command with this value.
-	transition: |string|, key-sequence to transition from mode back into
-		initial mode.  Example: vmap ending in normal mode, transition
-		might be something like '[v'] to highlight the region in visual
-		mode.  This way, when the mapping is repeated, it is in the
-		correct mode and rhs can be activated.  If omitted, then try
-		making a best guess:
-		map mode    default
-		v   n       `<lt>v`>
-		n   v       <C-\><C-N>
-		i   n       a
-		n   i       <C-\><C-N>
-	verbose: |Boolean| echom commands for debugging.
-
-Example 1 ~
-Print reltime in normal mode after pressing "asdf". Repeat with "k".  >
-	:Repeatable repeat=k nmap asdf :echo join(reltime(), ':')<CR>
-<Example 2~
-Use exec to repeat mappings containing <SID>. >
-	function s:MyFunc()
-		echo 'MyFunc was called!'
-	endfunction
-	exec 'Repeatable nmap asdf :call ' . expand('<SID>') . 'MyFunc()<CR>'
-<I have not yet found a reliable way to detect the <SID> of where the user
-command is called, so for mappings containing <SID>, options are using |:exec|
-or the SID setting.
-
-Details~
-repeatable.vim works by creating various intermediate mappings:
-1. *map %(lhs) <Plug>repeatable_map:%(mapmode):%(name);<Plug>repeatable_wait:%(mapmode):%(name);
-2. *map <Plug>repeatable_map:%(mapmode):%(name); %(rhs)
-3. %(mode)map <expr> <Plug>repeatable_wait:%(mapmode):%(name);
-	\ getchar(1) == 0 ? "%(noop)\<Plug>repeatable_wait:%(mapmode):%(name);" : ""
-4. %(mode)map <Plug>repeatable_wait:%(mapmode):%(name);$(repeat) %(transition)%(lhs)
-
-%(varname) is replaced by whatever the setting is.
-	lhs: lhs of the map commandline
-	rhs: rhs of the map commandlin
-	noop: a no-op key-sequence, "\<Ignore>" if available.
-		Otherwise, a mapping to <Cmd>exec ''<CR> if <Cmd> is available
-		Otherwise <silent> mappings:
-			n -> :exec ''<CR>
-			i -> <C-R>=''<CR>
-			v -> g<C-G>
-	mode: mode setting
-	name: name setting
-	mapmode: prefix of map command. example: for "inoremap", it will be "i"
-		and for "map", it will be ""
-	repeat: The repeat setting.
-	transition: The transition setting.
-
-How it works~
-Mapping 1 activates mapping 2 and then enters mapping 3.
-Mapping 2 just runs the {rhs} of the original mapping.
-Mapping 3 is intentionally ambiguous with mapping 4.  As a result, vim will
-	pause waiting for disambiguation between these two mappings.  If vim
-	disambiguates to mapping 3, then that means no extra key was pressed.
-	It first does an effective no-op command followed by re-enterring the
-	ambiguous state.  The %(noop) is necessary because otherwise, the
-	mapping would be left- |recursive_mapping| and it would just be taken
-	literally without mapping.  An alternative could be an <expr> mapping
-	that returns |nr2char(||getchar()|) so vim would continuously wait
-	until getting a character.  However, |getchar()| moves the cursor into
-	the status bar.  Using this recursive ambiguous method keeps the
-	cursor in the current text position.
-Mapping 4 just maps to mapping 1 after %(transition) to put vim back into the
-	appropraite mode before re-activating {rhs}.
-
-							*jhv#mappings#Tmap()*
-jhv#mappings#Tmap(...)
-Manage a tree of mappings.
-
-Arguments are parsed with |jhv#parse#Settings()| except the first argument
-which should be the name of the tree to use.  Besides the settings, Tmap takes
-a mapping and interprets it as a mapping of a tree.  An action map to the
-{rhs} is created and the action is added to the keymap created from {lhs}.
-If the base tree map does not already exist, it will be created.  Lastly,
-depending on settings, an entry map might be created to perform the {rhs}
-action and enter the tree.
-
+Arguments are parsed with |jhv#parse#Settings()| with the additional
+allowance of a tree name as a bare first argument.  Following the settings
+should be a map command as it would normally appear in a script.  TMap will
+parse the mapping command and generate the corresponding tree, key, action,
+and entry maps if needed.
 
 settings:
   * tree: |str|, name of the tree.  As an alternative, the "tree=name" can be
-    shortened to "=name" to specify the tree name.  If the first argument is
-    not a "setting=value", then it is assumed to be the tree name.
+    shortened to "=name" to specify the tree name.  It can also be given as
+    the first argument without any =.
   * enter: |str|, "[*[nore]map] [{lhs}] [{rhs}]".  If non-empty, then this is
-    used to create an entry map.  the mapcmd and lhs will be taken from the
+    used to create an entry map.  The mapcmd and lhs will be taken from the
     main mapping if omitted.  rhs defaults to empty and will be used as a
-    prefix before activating the keymap. Whitespace is required to
-    differentiate lhs and rhs.
+    prefix before activating the keymap. When omitting {lhs}, whitespace
+    before {rhs} is required.  Otherwise, it will be parsed as {lhs}.
     Examples: >
       'imap lhs rhs'
       'lhs rhs'
@@ -277,58 +127,37 @@ settings:
       'imap lhs'
       'imap'
       'lhs'
-      '  rhs'
+      ' rhs'
 <  * target: |str|, target tree to enter after the mapping.  This defaults to
-    the current target if any, else the current tree.  If empty, then there is
-    no target tree (explicitly exit the tree).
-  * SID: sid to replace <SID> in the mapping.
+    the current target of an existing keymap if any. Otherwise, use the
+    current tree.  Specify an empty target to explicitly exit the tree.
+    The base tree map is only generated if this matches tree.
+  * SID: sid to replace <SID> in the mapping.  Generally this will be
+    specified as: >
+    expand('<SID>')
+<    This is only necessary if the mapping has <SID> in it.
   * verbose: bool, print map commands.
-  * keep: bool, keep the existing keypresses if a map does not already exist.
+  * keep: bool, keep the default keypress actions if no prior mapping exists.
+    This is useful to add actions on top of the default action.
   * add: |str|, <: add action before, >: add action after, =: replace existing
     action.  Default is =.
-  * name: |str| A name for the action.  If omitted, then use LHS.
-  * extend: |int| 0: overwrite, 1: add action before, 2: add action after
-
-NOTE
-types 4 and 1 must be in the same map mode.
-type 3 could be in a different mode, but its action would need to different
-from simply {type2}{type1}
+  * name: |str| A name for the action.  If omitted, then use {lhs} to generate
+    a name.
 
 Example~
-Add mappings to indent the selected lines. >
-	Tmap mytree emode=vnore rpre="'<lt>V'>" enter=> nnoremap <C-T> '<lt>V'>>
-	Tmap mytree emode=vnore rpre="'<lt>V'>" enter=<lt> nnoremap <C-D> '<lt>V'><lt>
-The mappings go into the "mytree" tree.  emode indicates that entry into this
-tree should be via a vnoremap command. The rpre modifies the map {rhs} by
-removing the '<lt>V' from the beginning and uses that as the entry map {rhs}.
-enter determines the key sequence to enter the "mytree" tree (< or >).
-Finally, the nnoremap uses <C-T> and <C-D> to select the last selected range
-and then shift them left or right accordingly.
-
-NOTE: Repeatable is basically the same as a tree with only a single branch.
-
-
-===Helper Functions===
-							*jhv#mappings#Map2Estr()*
-jhv#mappings#Map2Estr(mpcmd, quote=1)
-Return a string that can be |eval()|ed as the string representation of the
-map key sequence.
-Example: >
-	eval(jhv#mappings#Map2Estr('<C-X>\')) == "\<C-X>\\"
-This is useful for creating strings that can be used with exec. or eval
-Return a string that would evaluate to a:mpcmd when passed to |eval()|.
-If quote, then the string is also surrounded with double quotes.  Otherwise
-the quotes are omitted.  This is useful if the result is intended for use
-inside a string such as: >
-	eval(printf('"%s %s..."', jhv#mappings#Map2Estr('<C-X>\', 0), ...))
-<
-
-							*jhv#mappings#Str2Map()*
-jhv#mappings#Str2Map(mpstr)
-Convert a str into an appropriate string for use in the {rhs} of a mapping to
-retain the original value.  Basically, convert specific characters to their
-<Name> format so when used as RHS of an <expr> mapping, the string will not
-change meaning.
-
-
- vim:tw=78:ts=8:noet:ft=help:norl:
+Add mappings to indent the selected lines >
+	TMap mytree enter='vnoremap > :<CR>' nnoremap <C-T> '<lt>V'>>
+	TMap mytree enter='vnoremap <lt> :<CR>' nnoremap <C-D> '<lt>V'><lt>
+The enter settings indicate that the tree should be enterred via < and > in
+visual mode.  At that point, :<CR> will be run only during the entry map.
+This puts vim in a state where the nnoremap <C-T> can be used to indent
+the selected lines after which the default tree (the current tree) is entered.
+At that point, any <C-T> or <C-D> can be used to indent/dedent the same
+previously-selected lines.
+NOTE This is similar to >
+	TMap mytree enter= nnoremap <C-T> '<lt>V'>>
+	TMap mytree enter= nnoremap <C-D> '<lt>V'><lt>
+	TMap mytree target=mytree vnoremap > >
+	TMap mytree target=mytree vnoremap <lt> <lt>
+except this second version creates more mappings since there are now base tree
+maps for both normal and visual modes.

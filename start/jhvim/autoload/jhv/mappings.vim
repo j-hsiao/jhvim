@@ -150,7 +150,7 @@ function s:NormalizeKeymap(treename, mode, lhs, keep, name)
 	"Return [lhs, actions, rep] for a normalized key mapping.
 	"If keep, when there is no original mapping,
 	"the raw nonrecursing lhs is used as the corresponding action.
-	let treemap = s:TreeLhs(a:treename)
+	let treemap = s:TreeLHS(a:treename)
 	let lhs = treemap . a:lhs
 	let mdict = maparg(lhs, a:mode, 0, 1)
 	if empty(mdict)
@@ -174,14 +174,20 @@ function s:NormalizeKeymap(treename, mode, lhs, keep, name)
 	endif
 endfunction
 
-function jhv#mappings#Tmap(...)
+
+let s:entrypat = join([
+	\ '\m^',
+	\ '\%(\([^[:blank:]]\?\%(nore\)\?map\)[[:blank:]]\?\)\?',
+	\ '\([^[:blank:]]*\)',
+	\ '\%([[:blank:]]\+\(.*\)\)\?$',
+	\ ], '')
+function jhv#mappings#TMap(...)
 	let settingnames = [
-		\ 'tree', '', 'enter', 'target', 'SID', 'verbose', 'keep',
-		\ 'add', 'name', 'extend'
-	]
+		\ 'tree', '', 'enter', 'target', 'SID',
+		\ 'verbose', 'keep', 'add', 'name'
+	\ ]
 	let [settings, mapcmd] = call('jhv#parse#Settings', extend([settingnames], a:000))
 	if empty(settings)
-		echom 'prefixing tree'
 		let rawtree = extend([settingnames], a:000)
 		let rawtree[1] = substitute(rawtree[1], '\m^[[:space:]]*\(.*\)', 'tree=\1', '')
 		let [settings, mapcmd] = call('jhv#parse#Settings', rawtree)
@@ -203,13 +209,12 @@ function jhv#mappings#Tmap(...)
 	endif
 	let [mapline, mapcmd, mapmode, mapnore, mapargs, lhs, rhs; ignored] = mapmatch
 	if match(rhs, '\m[[:blank:]]\(s:\|<SID>\)[a-zA-Z0-9_]') >= 0
-		echohl WarningMsg | echom 'WARNING: Tmap <SID> was not replaced' | echohl None
+		echohl WarningMsg | echom 'WARNING: TMap <SID> was not replaced' | echohl None
 	endif
 
 	let maps = []
-	let treemap = s:TreeLhs(treename)
+	let treemap = s:TreeLHS(treename)
 	let actionname = s:Name(get(settings, 'name', lhs))
-	call add(maps, s:MakeTree(treemap, mapmode))
 	if empty(rhs) || rhs == '<Nop>'
 		let action = ''
 	else
@@ -217,16 +222,16 @@ function jhv#mappings#Tmap(...)
 		call add(maps, printf('%s <special> %s %s %s', mapcmd, mapargs, action, rhs))
 	endif
 	let [keymap, keyactions, keytarget] = s:NormalizeKeymap(
-		\ treename, mapmode, lhs, get(settings, 'keep', v:false))
+		\ treename, mapmode, lhs, get(settings, 'keep', v:false), actionname)
 	if has_key(settings, 'target')
-		let target = settings['target']
-		if empty(target)
-			let target = keytarget
-		else
-			let target = s:TreeLhs(s:Name(target))
-		endif
+		let target = s:TreeLHS(s:Name(settings['target']))
+	elseif empty(keytarget)
+		let target = s:TreeLHS(treename)
 	else
-		let target = ''
+		let target = keytarget
+	endif
+	if target == treemap
+		call add(maps, s:MakeTree(treemap, mapmode))
 	endif
 	let add = get(settings, 'add', '=')
 	if add == '='
@@ -239,7 +244,7 @@ function jhv#mappings#Tmap(...)
 
 	let enter = get(settings, 'enter', ' ')
 	if !empty(enter)
-		let [whole, ecmd, elhs, erhs; ignored] = matchlist(text, '\m^\([^[:space:]]\?\%(nore\)\?map\)\?[[:blank:]]\?\([^[:blank:]]*\)[[:blank:]]*\(.*\)$')
+		let [whole, ecmd, elhs, erhs; ignored] = matchlist(enter, s:entrypat)
 		if empty(ecmd)
 			let ecmd = mapcmd
 		endif
@@ -247,18 +252,18 @@ function jhv#mappings#Tmap(...)
 			let elhs = lhs
 		endif
 		let [whole, emode, enore; ignored] = matchlist(ecmd, '\m^\([^[:space:]]\)\?\(nore\)\?map')
-		if empty(erhs)
+		if empty(erhs) || erhs == '<Nop>'
 			let eaction = ''
 		else
-			let eaction = s:ActionLHS(treename, actionname)
-			call add(maps, printf('%s <special> %s %s%s', ecmd, elhs, erhs))
+			let eaction = s:ActionLHS(treename, printf('enter_%s', actionname))
+			call add(maps, printf('%s <special> %s %s', ecmd, eaction, erhs))
 		endif
 		call add(maps, printf('%smap <special> %s %s%s%s', emode, elhs, eaction, treemap, lhs))
 	endif
 
 	let verbose = get(settings, 'verbose', v:false)
 	for item in maps
-		if len(maps)
+		if len(item)
 			if verbose
 				echom printf('Creating map: %s', item)
 			endif
