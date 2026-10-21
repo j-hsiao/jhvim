@@ -25,4 +25,4 @@ function s:STS()
 endfunction
 
 " Explicitly intering a tab allows pressing tab only to enter more tabs.
-Repeatable repeat=<Tab> inoremap <C-V><Tab> <C-V><Tab>
+TMap rawtab enter='inoremap <C-V><Tab>' inoremap <Tab> <C-V><Tab>
