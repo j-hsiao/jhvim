@@ -1,13 +1,7 @@
-vnoremap <expr> <Plug>JHV_Vsearch;Search_forward; jhv#vsearch#Search('/', v:true)
-vnoremap <expr> <Plug>JHV_Vsearch;Search_forward_exact; jhv#vsearch#Search('/', v:false)
-vnoremap <expr> <Plug>JHV_Vsearch;Search_backward; jhv#vsearch#Search('?', v:true)
-vnoremap <expr> <Plug>JHV_Vsearch;Search_backward_exact; jhv#vsearch#Search('?', v:false)
-nnoremap <expr> <Plug>JHV_Vsearch;Search_note_header; jhv#vsearch#NoteSearch()
+TMap add=> name='search forward' vnoremap <expr> * jhv#vsearch#Search('/', v:true)
+TMap add=> name='search backward' vnoremap <expr> # jhv#vsearch#Search('?', v:true)
 
+TMap add=> name='search forward exact' vnoremap <expr> <Leader>* jhv#vsearch#Search('/', v:false)
+TMap add=> name='search backward exact' vnoremap <expr> <Leader># jhv#vsearch#Search('?', v:false)
 
-
-ExtendMap vmap * <Plug>JHV_Vsearch;Search_forward;
-ExtendMap vmap # <Plug>JHV_Vsearch;Search_backward;
-ExtendMap vmap <Leader>* <Plug>JHV_Vsearch;Search_forward_exact;
-ExtendMap vmap <Leader># <Plug>JHV_Vsearch;Search_backward_exact;
-ExtendMap nmap <Leader><C-]> <Plug>JHV_Vsearch;Search_note_header;
+TMap add=> name='search note header' nnoremap <expr> <Leader><C-]> jhv#vsearch#NoteSearch()
