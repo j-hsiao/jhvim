@@ -165,10 +165,10 @@ function s:NormalizeKeymap(treename, mode, lhs, keep)
 			return [lhs, '', treemap]
 		endif
 	else
-		let parsed = matchlist(mdict['rhs'], '\m^\(\%(<Plug>jhvaction:[^:;]*:[^:;]*:[^:;]*;\)*\)\(<Plug>jhvtree:[^:;]*;\)\?$' )
+		let parsed = matchlist(mdict['rhs'], '\m^\(\%(<Plug>jhvaction:[^:;]*:[^:;]*\%(:[[:digit:]]*\)\?;\)*\)\(<Plug>jhvtree:[^:;]*;\)\?$' )
 		if empty(parsed)
 			let action = s:Action(a:treename, s:Name('pre_' . a:lhs), 1)
-			jhv#mappings#CopyMap(a:mode, lhs, action, mdict)
+			call jhv#mappings#CopyMap(a:mode, lhs, action, mdict)
 			return [lhs, action, treemap]
 		else
 			let [whole, actions, rep; ignored] = parsed
