@@ -1,16 +1,17 @@
 set cpo+=<
 function s:MyFunction()
-	redraw | echo "script-local MyFunction was called!" . join(reltime(), ':')
+	redraw | echo 'script-local MyFunction was called!' . join(reltime(), ':')
 endfunction
 
-" Repeatable call a script-local function.
-call jhv#mappings#Repeatable(
-	\ expand('<SID>'), 'nmap asdf :call <SID>MyFunction()<CR>')
+" Repeatably call a script-local function.
+call jhv#mappings#TMap(
+	\ 't1', 'enter="nmap asdf"', expand('<SID>'), 'nmap . :call <SID>MyFunction()<CR>')
 
-function s:RepeatableTestEchoRange() range
+function s:TestEchoRange() range
 	redraw | echo printf('from line %s to %s: %s', a:firstline, a:lastline, join(reltime(), ':'))
 endfunction
 
 " Mapping that changes modes.
 
-execute 'Repeatable ' . expand('<SID>') . ' mode=n repeat=k vnoremap asdf :call <SID>RepeatableTestEchoRange()<CR>'
+execute 'TMap t2 ' . expand('<SID>') . ' enter=''vnoremap asdf :<CR>'''
+	\ . ' nnoremap k ''<lt>V''>:call <SID>TestEchoRange()<CR>'
