@@ -285,7 +285,9 @@ function jhv#mappings#TMap(...)
 			let eaction = s:Action(treename, printf('enter_%s', actionname), 1)
 			call add(maps, printf('%s <special> %s %s', ecmd, eaction, erhs))
 		endif
-		call add(maps, printf('%smap <special> %s %s%s%s', emode, elhs, eaction, treemap, lhs))
+		if emode != mapmode || !empty(treemap) || elhs != lhs
+			call add(maps, printf('%smap <special> %s %s%s%s', emode, elhs, eaction, treemap, lhs))
+		endif
 	endif
 
 	for item in maps
