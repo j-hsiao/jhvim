@@ -1,6 +1,13 @@
+" Insert insertion if prepat matches before cursor and postpat matches after
+" cursor.
 " {ch: {ft: [[prepat, postpat, insertion]...]}}
 let s:ipats = {}
 
+" Removal patterns.
+"   prepat: pattern before opening character (group1 = to delete)
+"   target: corresponding close character(s) that were deleted
+"   pat: pattern before close character, (group1 = extra to delete before
+"        closing character)
 " {ch: {ft: [[prepat, target],...]}}, {ch: {ft: [pat,...]}}
 let s:rpats = [{}, {}]
 

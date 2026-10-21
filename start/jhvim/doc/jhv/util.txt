@@ -6,5 +6,5 @@ relative cursor position.
 
 							*jhv#util#DeleteText()*
 jhv#util#DeleteText(nbytes, pos)
-Remove text at the from pos to pos+nbytes on the current line without changing
+Remove text from pos to pos+nbytes on the current line without changing
 the relative cursor position.
