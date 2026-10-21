@@ -70,14 +70,21 @@ endfunction
 
 function s:Name(lhs)
 	" Convert a keyseq to a name-like string
-	return substitute(a:lhs, '\m[[:blank:]:;]', '_', 'g')
+	return substitute(a:lhs, '\m[[:blank:]:;\\]', '_', 'g')
 endfunction
 
 let s:autonum = 0
-function s:ActionLHS(treename, actionname)
+function s:Action(treename, actionname, ...)
 	" Generate an actionmap LHS.
-	let s:autonum += 1
-	return printf('<Plug>jhvaction:%s:%s:%d;', a:treename, a:actionname, s:autonum)
+	if a:0 && a:1
+		let s:autonum += 1
+		return printf('<Plug>jhvaction:%s:%s:%d;', a:treename, a:actionname, s:autonum)
+	else
+		return printf('<Plug>jhvaction:%s:%s;', a:treename, a:actionname)
+	endif
+endfunction
+function jhv#mappings#Action(tree, action)
+	return s:Action(s:Name(a:tree), s:Name(a:action))
 endfunction
 
 function s:TreeLHS(treename)
@@ -92,10 +99,7 @@ endfunction
 function s:MakeTree(lhs, mode)
 	" Create the an exec string to create a base tree map.
 	" It should repeatedly call itself until a key is pressed.
-	if empty(a:lhs)
-		return ''
-	endif
-	if len(maparg(a:lhs, a:mode))
+	if empty(a:lhs) || len(maparg(a:lhs, a:mode))
 		return ''
 	endif
 	return printf(
@@ -146,16 +150,15 @@ function jhv#mappings#CopyMap(mode, lhs, newlhs, ...)
 	endif
 endfunction
 
-function s:NormalizeKeymap(treename, mode, lhs, keep, name)
+function s:NormalizeKeymap(treename, mode, lhs, keep)
 	"Return [lhs, actions, rep] for a normalized key mapping.
-	"If keep, when there is no original mapping,
-	"the raw nonrecursing lhs is used as the corresponding action.
+	"Create an action map if necessary for the keymap to be normalized.
 	let treemap = s:TreeLHS(a:treename)
 	let lhs = treemap . a:lhs
 	let mdict = maparg(lhs, a:mode, 0, 1)
 	if empty(mdict)
 		if a:keep
-			let action = s:ActionLHS(a:treename, s:Name(a:lhs))
+			let action = s:Action(a:treename, s:Name('raw_' . a:lhs), 1)
 			exec printf('%snoremap <special> %s %s', a:mode, action, a:lhs)
 			return [lhs, action, treemap]
 		else
@@ -164,7 +167,7 @@ function s:NormalizeKeymap(treename, mode, lhs, keep, name)
 	else
 		let parsed = matchlist(mdict['rhs'], '\m^\(\%(<Plug>jhvaction:[^:;]*:[^:;]*:[^:;]*;\)*\)\(<Plug>jhvtree:[^:;]*;\)\?$' )
 		if empty(parsed)
-			let action = s:ActionLHS(a:treename, s:Name(a:lhs))
+			let action = s:Action(a:treename, s:Name('pre_' . a:lhs), 1)
 			jhv#mappings#CopyMap(a:mode, lhs, action, mdict)
 			return [lhs, action, treemap]
 		else
@@ -195,7 +198,8 @@ function jhv#mappings#TMap(...)
 
 	let tree = get(settings, 'tree', get(settings, '', ''))
 	let treename = s:Name(tree)
-	if get(settings, 'verbose', v:false)
+	let verbose = get(settings, 'verbose', v:false)
+	if verbose
 		echom printf('Managing tree "%s"', tree)
 		for [item, value] in items(settings)
 			echom printf('%s: %s', item, value)
@@ -215,33 +219,56 @@ function jhv#mappings#TMap(...)
 	let maps = []
 	let treemap = s:TreeLHS(treename)
 	let actionname = s:Name(get(settings, 'name', lhs))
+	"----------
+	"action map
+	"----------
 	if empty(rhs) || rhs == '<Nop>'
 		let action = ''
+	elseif match(rhs, printf('\m^<Plug>jhvaction:\V%s\m:[^:;]*;$', treename)) >= 0
+		let nactionname = substitute(rhs,  '\m^<Plug>jhvaction:[^:;]*:\([^:;]*\);$', '\1', '')
+		if !empty(get(settings, 'name', '')) && nactionname != actionname
+			echohl WarningMsg
+				\ | echom 'WARNING: rhs is a single action.'
+				\ | echohl None
+		endif
+		let action = rhs
+		let actionname = nactionname
 	else
-		let action = s:ActionLHS(treename, actionname)
-		call add(maps, printf('%s <special> %s %s %s', mapcmd, mapargs, action, rhs))
+		let action = s:Action(treename, actionname, !has_key(settings, 'name'))
+		if empty(maparg(action, mapmode))
+			call add(maps, printf('%s <special> %s %s %s', mapcmd, mapargs, action, rhs))
+		else
+			throw printf('Action name already taken: %s', actionname)
+		endif
 	endif
+	"-------
+	"key map
+	"-------
 	let [keymap, keyactions, keytarget] = s:NormalizeKeymap(
-		\ treename, mapmode, lhs, get(settings, 'keep', v:false), actionname)
+		\ treename, mapmode, lhs, get(settings, 'keep', v:false))
 	if has_key(settings, 'target')
 		let target = s:TreeLHS(s:Name(settings['target']))
-	elseif empty(keytarget)
-		let target = s:TreeLHS(treename)
 	else
 		let target = keytarget
 	endif
+	"--------
+	"tree map
+	"--------
 	if target == treemap
 		call add(maps, s:MakeTree(treemap, mapmode))
 	endif
 	let add = get(settings, 'add', '=')
-	if add == '='
-		call add(maps, printf('%smap <special> %s%s %s%s', mapmode, treemap, lhs, action, target))
+	if add == '>'
+		call add(maps, printf('%smap <special> %s%s %s%s%s', mapmode, treemap, lhs, keyactions, action, target))
 	elseif add == '<'
 		call add(maps, printf('%smap <special> %s%s %s%s%s', mapmode, treemap, lhs, action, keyactions, target))
 	else
-		call add(maps, printf('%smap <special> %s%s %s%s%s', mapmode, treemap, lhs, keyactions, action, target))
+		call add(maps, printf('%smap <special> %s%s %s%s', mapmode, treemap, lhs, action, target))
 	endif
 
+	"---------
+	"enter map
+	"---------
 	let enter = get(settings, 'enter', ' ')
 	if !empty(enter)
 		let [whole, ecmd, elhs, erhs; ignored] = matchlist(enter, s:entrypat)
@@ -255,13 +282,12 @@ function jhv#mappings#TMap(...)
 		if empty(erhs) || erhs == '<Nop>'
 			let eaction = ''
 		else
-			let eaction = s:ActionLHS(treename, printf('enter_%s', actionname))
+			let eaction = s:Action(treename, printf('enter_%s', actionname), 1)
 			call add(maps, printf('%s <special> %s %s', ecmd, eaction, erhs))
 		endif
 		call add(maps, printf('%smap <special> %s %s%s%s', emode, elhs, eaction, treemap, lhs))
 	endif
 
-	let verbose = get(settings, 'verbose', v:false)
 	for item in maps
 		if len(item)
 			if verbose

@@ -100,7 +100,6 @@ dict can be provided as the result of |maparg(|lhs, mode, 0, 1) if the dict was
 already calculated.  Otherwise, |maparg()| will be called.  If there is no
 mapping to copy, then create a non-recursive mapping from {newlhs} to {lhs}.
 
-
 							*jhv#mappings#TMap()*
 jhv#mappings#TMap(...)
 Add mappings to a tree.
@@ -161,3 +160,8 @@ NOTE This is similar to >
 	TMap mytree target=mytree vnoremap <lt> <lt>
 except this second version creates more mappings since there are now base tree
 maps for both normal and visual modes.
+
+							*jhv#mappings#Action()*
+jhv#mappings#Action(treename, actionname)
+Generate LHS for an action used by TMap.
+This allows reusing an action in another mapping.
