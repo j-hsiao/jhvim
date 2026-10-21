@@ -9,8 +9,8 @@ if maparg('<Leader><Leader>', 'i') == ''
 endif
 
 " Break undo before large-ish deletion in insert mode
-ExtendMap before=1 keep=1 inoremap <C-W> <C-G>u
-ExtendMap before=1 keep=1 inoremap <C-U> <C-G>u
+TMap name='pre rm break undo' add=< keep=1 inoremap <C-W> <C-G>u
+exec 'TMap add=< keep=1 inoremap <C-U>' jhv#mappings#Action('', 'pre rm break undo')
 
 " Easier remove search highlighting.
 if maparg('<C-[><C-[>') == ''
