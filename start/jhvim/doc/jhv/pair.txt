@@ -29,7 +29,7 @@ Only a lone ] remains.
 							*jhv#pair-settings*
 Settings~
 jhv#pair#extend
-  bool, Use |ExtendMap| instead of overwriting any existing ones.
+  bool, Extend mappings instead of simply overwriting any existing ones.
 jhv#pair#defaults
   bool, Add the default pairings/mappings.  Otherwise, the user
   must add them themselves (call jhv#pair#Add and add mappings for

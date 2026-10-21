@@ -44,8 +44,8 @@ function s:CalcIpats(c1, c2, flaglist)
 			\ join([a:c1, '\', a:c2, repeat(s:StepLeft, 2)], '')])
 		if !has_key(s:ipats, '\')
 			let s:ipats['\'] = {}
-			call jhv#mappings#ExtendMap(
-				\ 'inoremap <expr> <silent> <special> <Bslash> jhv#pair#Insert(''<Bslash>'')')
+			call jhv#mappings#TMap(
+				\ 'add=> inoremap <expr> <silent> <special> <Bslash> jhv#pair#Insert(''<Bslash>'')')
 		endif
 	endif
 	call add(icpats, ['', '\m^\V' . escape(a:c2, '\/'), s:StepRight])
@@ -159,7 +159,7 @@ function jhv#pair#Add(c1, c2, ...)
 		let rhs = substitute(substitute(string(item), '<', '<lt>', 'g'), '\\', '<Bslash>', 'g')
 		let cmd = printf(pat, lhs, rhs)
 		if g:jhv#pair#extend
-			call jhv#mappings#ExtendMap(cmd)
+			call jhv#mappings#TMap('add=>', cmd)
 		else
 			exe cmd
 		endif
