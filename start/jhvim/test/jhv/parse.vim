@@ -1,5 +1,17 @@
 let [settings, cmd] = jhv#parse#Settings(['a', 'b', 'c'], expand('<SID>'), 'a=1', 'b="hello world" c="goodbye world\nokaydokay" b commanded', 'extra')
 
+function s:MyFunc(...)
+	let [settings, args] = call(
+		\ 'jhv#parse#Settings', extend([['a', 'b', 'c']], a:000))
+	call assert_true(settings['SID'] == expand('<SID>'))
+	call assert_true(settings['a'] == 'hello ''world''')
+	call assert_true(settings['b'] == '"hello" world')
+	call assert_true(args == 'remaining command')
+endfunction
+command -nargs=1 CheckParseSettings call <SID>MyFunc(<f-args>)
+
+exec 'CheckParseSettings' expand('<SID>') "a='hello ''world'''" 'b=''"hello" world'' remaining command'
+
 call assert_true(settings['SID'] == expand('<SID>'))
 call assert_true(settings['a'] == 1)
 call assert_true(settings['b'] == 'hello world')

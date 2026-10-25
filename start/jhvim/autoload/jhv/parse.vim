@@ -20,7 +20,7 @@ function jhv#parse#Settings(settings, ...)
 		\ '\m^[[:blank:]]*\([[:alpha:]_][[:alnum:]_]*\|\)=',
 		\ '\(\%(',
 			\ '"\%(\\.\|[^"]\)*"',
-			\ '\|', "'[^']*'",
+			\ '\|', '''\%(''''\|[^'']\)*''',
 			\ '\|[^[:blank:]]',
 		\ '\)*\)',
 		\ '\%([[:blank:]]\+\|$\)',
@@ -49,8 +49,9 @@ function jhv#parse#Settings(settings, ...)
 					endif
 				endif
 				if empty(valid) || has_key(ret, settingmatch[1]) || index(valid, settingmatch[1]) >= 0 || settingmatch[1] == 'SID'
-					if match(settingmatch[2], "\\m^'[^']*'$") >= 0
-						let value = settingmatch[2][1:-2]
+					if match(settingmatch[2], '\m^''\%(''''\|[^'']\)*''$') >= 0
+						let value = substitute(
+							\ settingmatch[2][1:-2], '''''', '''', 'g')
 					else
 						let value = settingmatch[2]
 						try
