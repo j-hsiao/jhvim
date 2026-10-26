@@ -1,21 +1,32 @@
 " Insert insertion if prepat matches before cursor and postpat matches after
 " cursor.
 " {ch: {ft: [[prepat, postpat, insertion]...]}}
+"   ch: the character (opening or closing)
+"   ft: the filetype, empty string for the default settings.
+"   prepat: regex matching before the insertion point.
+"   postpat: regex to match after the insertion point.
+"   insertion: the character to insert if both prepat and postpat match.
 let s:ipats = {}
 
 " Removal patterns.
-"   prepat: pattern before opening character (group1 = to delete)
-"   target: corresponding close character(s) that were deleted
-"   pat: pattern before close character, (group1 = extra to delete before
-"        closing character)
 " {ch: {ft: [[prepat, target],...]}}, {ch: {ft: [pat,...]}}
+"   ch: the character to remove
+"   ft: the filetype, empty string for deafult
+"   prepat: pattern before (not including) opening character
+"           (group1 = extra characters to delete)
+"   target: corresponding close character(s) that were deleted
+"   pat: pattern before (not including) close character,
+"        (group1 = extra to delete before closing character)
 let s:rpats = [{}, {}]
 
 let s:StepRight = "\<C-G>U\<Right>"
 let s:StepLeft = "\<C-G>U\<Left>"
+let s:PreBackSlash = '\%(^\|[^\\]\)\%(\\\\\)*\(\\\)$'
 
+"Use TMap to extend added keymapping, otherwise overwrite.
 let jhv#pair#extend = get(g:, 'jhv#pair#extend', 1)
 
+"Show the pair settings.
 function jhv#pair#Show()
 	echom 'ipats'
 	for [ch, ftd] in items(s:ipats)
@@ -35,6 +46,20 @@ function jhv#pair#Show()
 		endfor
 	endfor
 endfunction
+
+function s:CalcIpats(c1, c2, flags)
+	let iopats = []
+	let icpats = a:c1 == a:c2 ? iopats : []
+	if flags =~ 'r'
+		call add(iopats, [s:PreBackSlash, '', 
+			\ join([a:c1, '\', a:c2, repeat(s:StepLeft, 1+strchars(a:c2, 1))])])
+	elseif flags =~ 'b'
+		call add(iopats, [s:PreBackSlash, '', a:c1])
+endfunction
+
+"===
+"old
+"===
 
 function s:CalcIpats(c1, c2, flaglist)
 	" Calculate insertion pattern for open/close

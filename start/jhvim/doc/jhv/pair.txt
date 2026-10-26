@@ -26,6 +26,22 @@ And after "this" is removed, [] are deleted together.
 The first [] get deleted together.
 Only a lone ] remains.
 
+Leftward removals are handled in the following way:
+1. If the deleted character is a closing character, remove it and put it
+   on a stack.
+2. If the deleted character is an opening character, check if it matches
+   the top of the stack.  Remove if it matches.  Otherwise, do nothing
+   extra.  If the stack is empty, check the text on the right.  If it
+   matches the closing pattern, remove it.  Otherwise, depending on the
+   mapping used, if the closing characters exist to the right of the
+   insertion point, remove characters up to and including them.
+3. Depending on the mapping used to remove characters, continue removing
+   until the stack is empty.
+
+							*jhv#pair#Show*
+jhv#pair#Show()
+`echom` the current pair settings.
+
 							*jhv#pair-settings*
 Settings~
 jhv#pair#extend
