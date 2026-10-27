@@ -9,15 +9,13 @@
 let s:ipats = {}
 
 " Removal patterns.
-" {ch: {ft: [[prepat, target],...]}}, {ch: {ft: [pat,...]}}
-"   ch: the character to remove
+" {ch: {ft: [[prepat, target],...]}}
+"   ch: the character that was just removed.
 "   ft: the filetype, empty string for deafult
-"   prepat: pattern before (not including) opening character
-"           (group1 = extra characters to delete)
-"   target: corresponding close character(s) that were deleted
-"   pat: pattern before (not including) close character,
-"        (group1 = extra to delete before closing character)
-let s:rpats = [{}, {}]
+"   prepat: pattern before (not including) deleted character
+"           (ie group1 = extra characters to delete)
+"   target: corresponding close character(s) if any
+let s:rpats = {}
 
 let s:StepRight = "\<C-G>U\<Right>"
 let s:StepLeft = "\<C-G>U\<Left>"
@@ -92,7 +90,7 @@ endfunction
 function s:CalcRpats(c1, c2, flags)
 	"Calculate removal patterns
 	let ropats = []
-	let rcpats = []
+	let rcpats = a:c2 == a:c1 ? ropats : []
 	if flags =~ 'b'
 		call add(ropats, [s:PreBackSlash, ''])
 	elseif flags =~ 'r'
@@ -100,7 +98,7 @@ function s:CalcRpats(c1, c2, flags)
 			call add(ropats, [s:PreBackSlash[:-4] . '%\)$', '\' . a:c2])
 		endif
 		call add(ropats, [s:PreBackSlash, '\' . a:c2])
-		call add(rcpats, s:PreBackSlash)
+		call add(rcpats, [s:PreBackSlash, ''])
 	endif
 	if flags =~ 't' && a:c1 == a:c2
 		call add(ropats, [printf('\V\%%(%s\)\{2}', escape(a:c1, '\/')), repeat(a:c2, 3)])
