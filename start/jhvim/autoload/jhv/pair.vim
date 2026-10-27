@@ -9,17 +9,20 @@
 let s:ipats = {}
 
 " Removal patterns.
-" {ch: {ft: [[prepat, target],...]}}
+" {ch: {ft: [[prepat[, target]],...]}}
 "   ch: the character that was just removed.
 "   ft: the filetype, empty string for deafult
 "   prepat: pattern before (not including) deleted character
 "           (ie group1 = extra characters to delete)
-"   target: corresponding close character(s) if any
+"   target: empty string: push prepat group1 + ch to stack
+"           non-empty string: pop this string from stack
+"           omitted: neither
 let s:rpats = {}
 
 let s:StepRight = "\<C-G>U\<Right>"
 let s:StepLeft = "\<C-G>U\<Left>"
-let s:PreBackSlash = '\m\%(^\|[^\\]\)\%(\\\\\)*\(\\\)$'
+let s:PreBackSlash = '\m\\\@1<!\%(\%(\\\\\)*)\@>\(\\\)$'
+let s:Prebackslash = '\\\@1<!\%(\%(\\\\\)\*\)\@>\\'
 
 "Use TMap to extend added keymapping, otherwise overwrite.
 let jhv#pair#extend = get(g:, 'jhv#pair#extend', 1)
@@ -47,26 +50,34 @@ endfunction
 
 function s:CalcIpats(c1, c2, flags)
 	let iopats = []
-	let icpats = a:c1 == a:c2 ? iopats : []
+	ret = {a:c1: iopats}
+	if a:c1 == a:c2
+		let icpats = iopats
+	else
+		let icpats = []
+		let ret[a:c2] = icpats
+	endif
+	let e1 = escape(a:c1, '\/')
+	let e2 = escape(a:c2, '\/')
 	let L1 = strchars(a:c1, 1)
 	let L2 = strchars(a:c2, 1)
 	if flags =~ 'b'
 		call add(iopats, [s:PreBackSlash, '', a:c1])
 	elseif flags =~ 'r'
 		if flags =~ 'r%'
-			call add(iopats, [s:PreBackSlash[:-2] . '%\?$', '',
+			call add(iopats, [s:PreBackSlash[:-2] . '%\{,2}$', '',
 				\ join([a:c1, '\', a:c2, repeat(s:StepLeft, 1+L2)])])
 		else
 			call add(iopats, [s:PreBackSlash, '',
 				\ join([a:c1, '\', a:c2, repeat(s:StepLeft, 1+L2)])])
 		endif
 		if !has_key(s:ipats, '\')
-			let s:ipats['\'] = {}
+			let ret['\'] = [['', '\m^\\', s:StepRight]]
 			call jhv#mappings#TMap(
 				\ 'add=> inoremap <expr> <silent> <special> <Bslash> jhv#pair#Insert(''<Bslash>'')')
 		endif
 	endif
-	call add(icpats, ['', '\m^\V' . escape(a:c2, '\/'), repeat(s:StepRight, L2)])
+	call add(icpats, ['', '\m^\V' . e2, repeat(s:StepRight, L2)])
 	let allowedpre = ''
 	if flags =~ 'W'
 		if flags =~ 'p'
@@ -77,44 +88,63 @@ function s:CalcIpats(c1, c2, flags)
 	endif
 	if flags =~ 't' && a:c1 == a:c2
 		call add(icpats, [
-			\ printf('%s\V\%%(%s\)\{3}\$', allowedpre, escape(a:c1, '\/')),
+			\ printf('%s\V\%%(%s\)\{3}\$', allowedpre, e1),
 			\ '\m$\|\W', repeat(a:c2, 3) . repeat(s:StepLeft,3)])
 		call add(icpats, [
-			\ printf('%s\V\%%(%s\)\{2}\$', allowedpre, escape(a:c1, '\/')),
+			\ printf('%s\V\%%(%s\)\{2}\$', allowedpre, e1),
 			\ '\m$\|\W', repeat(a:c2, 4) . repeat(s:StepLeft,3)])
 	endif
 	call add(iopats, [allowedpre, '\m$\|\W', a:c1 . a:c2 . repeat(s:StepLeft, L2)])
-	return [iopats, icpats]
+	return ret
 endfunction
 
 function s:CalcRpats(c1, c2, flags)
 	"Calculate removal patterns
 	let ropats = []
-	let rcpats = a:c2 == a:c1 ? ropats : []
+	let ret = {a:c1: ropats}
+	if a:c2 == a:c1
+		let rcpats = ropats
+	else
+		let rcpats = []
+		let ret[a:c2] = rcpats
+	endif
+	let e1 = escape(a:c1, '\/')
+	let e2 = escape(a:c2, '\/')
 	if flags =~ 'b'
-		call add(ropats, [s:PreBackSlash, ''])
+		call add(ropats, [s:PreBackSlash])
 	elseif flags =~ 'r'
 		if flags =~ 'r%'
-			call add(ropats, [s:PreBackSlash[:-4] . '%\)$', '\' . a:c2])
+			call add(ropats, [s:PreBackSlash[:-4] . '%\?\)$', '\' . a:c2])
+		else
+			call add(ropats, [s:PreBackSlash, '\' . a:c2])
 		endif
-		call add(ropats, [s:PreBackSlash, '\' . a:c2])
 		call add(rcpats, [s:PreBackSlash, ''])
 	endif
-	if flags =~ 't' && a:c1 == a:c2
-		call add(ropats, [printf('\V\%%(%s\)\{2}', escape(a:c1, '\/')), repeat(a:c2, 3)])
-
-		let lpat = printf('\%%(^\|[^%s]\)\(\V%s\m\)',
-			\ escape(a:c1, '^-]\'), escape(repeat(a:c2, 2), '\/'))
-		let emptypair = printf('\V\(%s%s\)\$',
-			\ repeat(escape(a:c1, '\/'), 3),
-			\ repeat(escape(a:c2, '\/'), 2))
-		call add(rcpats, emptypair)
-		call add(rcpats, fullpair)
+	if a:c1 == a:c2
+		if flags =~ 'b'
+			let nopreb = printf('\%%(%s\)\@128<!', s:Prebackslash)
+		else
+			let nopreb = ''
+		endif
+		if flags =~ 't'
+			let triple = printf('%s\%%(%s\)\{3}', nopreb, e1)
+			let double = printf('%s\%%(%s\)\{2}', nopreb, e1)
+			let tpaired = printf('%s\.\{-}%s', triple, triple)
+			let notT = printf('\%%(%s\)\@!\.', triple)
+			let notTE = printf('\%%(%s\%%(%s\|\$\)\)\@!\.', double, e1)
+			let endTpair = printf('\(%s\.\{-}%s\)\$', triple, double)
+			call add(rcpats, [printf('\V\^\%%(\%%(%s\|%s\)\*\)\@>%s', notT, tpaired, endTpair), ''])
+			call add(ropats, [printf('\V\^\%%(\%%(%s\|%s\)\*\)\@>\(%s\)\$', notTE, tpaired, double), repeat(a:c2, 3)])
+		endif
+		let ch = printf('%s%s', nopreb, e1)
+		let pair = printf('%s\.\{-}%s', ch, ch)
+		call add(rcpats, [printf('\V\^\%%(\%%(\%%(%s\)\@!\.\|%s\)\*\)\@>%s', ch, pair, ch), ''])
+		call add(rcpats, [printf('\V\^\%%(\%%(\%%(%s\)\@!\.\|%s\)\*\)\@>\$', ch, pair), a:c2])
+	else
+		call add(ropats, ['', a:c2])
+		call add(rcpats, ['', ''])
 	endif
-	call add(rcpats, printf('\V\(%s\)\$', escape(a:c1, '\/')))
-	call add(rcpats, '')
-	call add(ropats, ['', a:c2])
-	return [ropats, rcpats]
+	return ret
 endfunction
 
 
@@ -166,7 +196,7 @@ function s:CalcIpats(c1, c2, flaglist)
 endfunction
 
 function s:CalcRpats(c1, c2, flaglist)
-	"Calculate removal patterns
+	"Calculate removal patterns and return a dict.
 	let [bflag, rflag, Wflag, tflag] = a:flaglist
 	let ropats = []
 	let rcpats = []
