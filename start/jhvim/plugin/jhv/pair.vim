@@ -8,8 +8,8 @@ inoremap <expr> <Plug>jhv_pair_prep_remove; jhv#pair#PrepRemove()
 
 if jhv#pair#defaults
 	call jhv#pair#Add('`', '`', 'markdown=bWt')
-	call jhv#pair#Add("'", "'", 'bW', 'bash,vim,sh=W', 'python=bWt')
-	call jhv#pair#Add('"', '"', 'bW', 'python=bWt')
+	call jhv#pair#Add("'", "'", 'bW', 'bash,vim,sh=W', 'python=bWpt')
+	call jhv#pair#Add('"', '"', 'bW', 'python=bWpt')
 	call jhv#pair#Add('(', ')', 'r')
 	call jhv#pair#Add('[', ']')
 	call jhv#pair#Add('{', '}')

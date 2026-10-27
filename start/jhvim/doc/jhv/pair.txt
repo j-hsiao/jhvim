@@ -78,19 +78,8 @@ Flag Values~
 'r': regex-like pair.  Match opening char backslash. >
   Insertion: \|  -> \(|\)
   Deletion : \(|\)  ->
+'r%': same as 'r' but also allow '\%' in front to trigger regex completion.
 't': "triple" flag.  Also handle triple opening and closing chars.
-Also handle the case if W flag is given.
-Example: python multiline string:
-  normal example >
-    |
-    "|"
-    ""|
-    """|"""
-<  W flag example: >
-    r|
-    r"|
-    r""|"
-    r"""|
-    r"""|"""
-'W': Do NOT complete the pair if preceded by a word. >
-  func|  ->  func(|
+'p': allow pair completion after python-related char (rfbut) such as
+     fstring or raw string.
+'W': Only complete pair only after a non-word.
