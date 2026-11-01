@@ -49,6 +49,7 @@ function jhv#pair#Show()
 endfunction
 
 function s:CalcIpats(c1, c2, flags)
+	" Return {ch: [patterns],...}
 	let iopats = []
 	ret = {a:c1: iopats}
 	if a:c1 == a:c2
@@ -100,6 +101,7 @@ endfunction
 
 function s:CalcRpats(c1, c2, flags)
 	"Calculate removal patterns
+	" Return {ch: [patterns],...}
 	let ropats = []
 	let ret = {a:c1: ropats}
 	if a:c2 == a:c1
@@ -147,6 +149,48 @@ function s:CalcRpats(c1, c2, flags)
 	return ret
 endfunction
 
+"Add a pair of characters to autopair.
+"extra args or flags, (ft[,ft]...=flags)
+function jhv#pair#Add(c1, c2, ...)
+	let s:ipats[a:c1] = {}
+	let s:rpats[a:c1] = {}
+	if a:c2 != a:c1
+		let s:ipats[a:c2] = {}
+		let s:rpats[a:c2] = {}
+	endif
+	for ftflags in a:0 ? a:000 : ['']
+		let parts = matchlist(ftflags, '\m^\(\^\)\?\%(\([^=]*\)=\)\?\(.*\)$')
+		if empty(parts)
+			throw printf('Bad pair flag: %s', ftflags)
+		endif
+		let [whole, exclude, ftypes, flagstr; ignore] = parts
+		if !empty(exclude)
+			if empty(ftypes)
+				let ftypes = ftflags
+			endif
+			for ft in split(ftypes, ',', v:true)
+				let [s:ipats[a:c1][ft], s:ipats[a:c2][ft],
+					\ s:rpats[a:c1][ft], s:rpats[a:c2][ft]] = [[], [], [], []]
+			endfor
+			continue
+		endif
+		for ft in split(ftypes, ',', v:true)
+			for dst, pats in [
+				\ [s:ipats, s:CalcIpats(a:c1, a:c2, flagstr)],
+				\ [s:rpats, s:CalcRpats(a:c1, a:c2, flagstr)]
+			\ ]
+				for ch, lst in items(pats)
+					if !has_key(dst, ch)
+						let dst[ch] = {}
+					endif
+					dst[ch][ft] = lst
+				endfor
+			endfor
+		endfor
+	endfor
+	"TODO: add mappings
+endfunction
+
 
 	"if bflag && rflag
 	"	throw 'Error: bflag and rflag are mutually exclusive.'
@@ -155,75 +199,6 @@ endfunction
 "old
 "===
 
-function s:CalcIpats(c1, c2, flaglist)
-	" Calculate insertion pattern for open/close
-	let [bflag, rflag, Wflag, tflag] = a:flaglist
-	let iopats = []
-	let icpats = a:c1 == a:c2 ? iopats : []
-	if bflag && rflag
-		throw 'Error: bflag and rflag are mutually exclusive.'
-	endif
-	if bflag
-		call add(iopats, ['\m\%(^\|[^\\]\)\%(\\\\\)*\\$', '', a:c1])
-	elseif rflag
-		call add(iopats, ['\m\%(^\|[^\\]\)\%(\\\\\)*\\$', '',
-			\ join([a:c1, '\', a:c2, repeat(s:StepLeft, 2)], '')])
-		if !has_key(s:ipats, '\')
-			let s:ipats['\'] = {}
-			call jhv#mappings#TMap(
-				\ 'add=> inoremap <expr> <silent> <special> <Bslash> jhv#pair#Insert(''<Bslash>'')')
-		endif
-	endif
-	call add(icpats, ['', '\m^\V' . escape(a:c2, '\/'), s:StepRight])
-	if tflag && a:c1 == a:c2
-		if Wflag
-			"Allows triple after a word-like
-			"example: r""""""
-			let insertion = repeat(a:c2, 3) . repeat(s:StepLeft, 3)
-			let prepat = printf('\V%s\$', repeat(escape(a:c1, '\/'), 3))
-			call add(icpats, [prepat, '\m^$\|^\W', insertion])
-		endif
-		let insertion = repeat(a:c2, 4) . repeat(s:StepLeft, 3)
-		let prepat = printf('\V%s\$', repeat(escape(a:c1, '\/'), 2))
-		call add(iopats, [prepat, '\m^$\|^\W', insertion])
-	endif
-	if Wflag
-		call add(iopats, ['\m^$\|\W$', '\m^$\|^\W', a:c1 . a:c2 . repeat(s:StepLeft, len(a:c2))])
-	else
-		call add(iopats, ['', '\m^$\|^\W', a:c1 . a:c2 . repeat(s:StepLeft, len(a:c2))])
-	endif
-	return [iopats, icpats]
-endfunction
-
-function s:CalcRpats(c1, c2, flaglist)
-	"Calculate removal patterns and return a dict.
-	let [bflag, rflag, Wflag, tflag] = a:flaglist
-	let ropats = []
-	let rcpats = []
-	if bflag
-		call add(ropats, ['\%(^\|[^\\]\)\%(\\\\\)*\(\\\)$', ''])
-	elseif rflag
-		call add(ropats, ['\%(^\|[^\\]\)\%(\\\\\)*\(\\\)$', '\' . a:c2])
-		call add(rcpats, '\%(^\|[^\\]\)\%(\\\\\)*\(\\\)$')
-	endif
-	if tflag
-		let lpat = printf('\%%(^\|[^%s]\)\(\V%s\m\)',
-			\ escape(a:c1, '^-]\'), escape(repeat(a:c2, 2), '\/'))
-		call add(ropats, [lpat, repeat(a:c2, 3)])
-		let emptypair = printf('\V\(%s%s\)\$',
-			\ repeat(escape(a:c1, '\/'), 3),
-			\ repeat(escape(a:c2, '\/'), 2))
-		let fullpair = printf('\V%s\.\*\(%s\)\$',
-			\ repeat(escape(a:c1, '\/'), 3),
-			\ repeat(escape(a:c2, '\/'), 2))
-		call add(rcpats, emptypair)
-		call add(rcpats, fullpair)
-	endif
-	call add(rcpats, printf('\V\(%s\)\$', escape(a:c1, '\/')))
-	call add(rcpats, '')
-	call add(ropats, ['', a:c2])
-	return [ropats, rcpats]
-endfunction
 
 function jhv#pair#Add(c1, c2, ...)
 	let s:ipats[a:c1] = {}
