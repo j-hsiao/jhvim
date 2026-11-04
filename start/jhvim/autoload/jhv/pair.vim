@@ -24,7 +24,7 @@ let s:StepLeft = "\<C-G>U\<Left>"
 let s:PreBackSlash = '\m\\\@1<!\%(\%(\\\\\)*)\@>\(\\\)$'
 let s:Prebackslash = '\\\@1<!\%(\%(\\\\\)\*\)\@>\\'
 
-"Use TMap to extend added keymapping, otherwise overwrite.
+"Use TMap to extend keymappings, otherwise overwrite.
 let jhv#pair#extend = get(g:, 'jhv#pair#extend', 1)
 
 "Show the pair settings.
@@ -158,12 +158,16 @@ function jhv#pair#Add(c1, c2, ...)
 		let s:ipats[a:c2] = {}
 		let s:rpats[a:c2] = {}
 	endif
+	let added = []
 	for ftflags in a:0 ? a:000 : ['']
 		let parts = matchlist(ftflags, '\m^\(\^\)\?\%(\([^=]*\)=\)\?\(.*\)$')
 		if empty(parts)
 			throw printf('Bad pair flag: %s', ftflags)
 		endif
 		let [whole, exclude, ftypes, flagstr; ignore] = parts
+		if flagstr =~ 'b' && flagstr =~ 'r'
+			throw 'Error: b and r pair flags are mutually exclusive.'
+		endif
 		if !empty(exclude)
 			if empty(ftypes)
 				let ftypes = ftflags
@@ -182,91 +186,31 @@ function jhv#pair#Add(c1, c2, ...)
 				for ch, lst in items(pats)
 					if !has_key(dst, ch)
 						let dst[ch] = {}
+						call add(added, ch)
 					endif
 					dst[ch][ft] = lst
 				endfor
 			endfor
 		endfor
 	endfor
-	"TODO: add mappings
+	let pat = 'inoremap <expr> <silent> <special> %s jhv#pair#Insert(%s)'
+	for item in added
+		let keynot = jhv#mappings#AsKeyNotation(item)
+		let mpcmd = printf(
+			\ pat, keynot,
+			\ jhv#mappings#AsKeyNotation(jhv#mappings#AsEval(keynot)))
+		if g:jhv#pair#extend
+			call jhv#mappings#Tmap('add=>', printf('name=add_pair_%s', item), mpcmd)
+		else
+			exe mpcmd
+		endif
+	endfor
 endfunction
 
 
-	"if bflag && rflag
-	"	throw 'Error: bflag and rflag are mutually exclusive.'
-	"endif
 "===
 "old
 "===
-
-
-function jhv#pair#Add(c1, c2, ...)
-	let s:ipats[a:c1] = {}
-	if a:c2 != a:c1
-		let s:ipats[a:c2] = {}
-	endif
-
-	let flags = a:0 ? a:000 : ['']
-	let hasdefault = v:false
-	let iodict = {}
-	let icdict = a:c1 == a:c2 ? iodict : {}
-
-	let rodict = {}
-	let rcdict = {}
-	for flag in flags
-		let parts = matchlist(flag, '\m^\(\^\)\?\%(\([^=]*\)=\)\?\(.*\)$')
-		if empty(parts)
-			throw printf('Bad pair flag: %s', flag)
-		endif
-		let [exclude, ftypes, flagstr] = parts[1:3]
-		if !empty(exclude)
-			if empty(ftypes)
-				let ftypes = flagstr
-			endif
-			for ft in split(ftypes, ',', v:true)
-				let [iodict[ft], icdict[ft], rodict[ft], rcdict[ft]] = [[],[],[],[]]
-			endfor
-			continue
-		endif
-		let flaglist = []
-		for item in 'brWt'
-			call add(flaglist, flagstr =~ item)
-		endfor
-		let [iopats, icpats] = s:CalcIpats(a:c1, a:c2, flaglist)
-		for ft in split(ftypes, ',', v:true)
-			let iodict[ft] = iopats
-			let icdict[ft] = icpats
-			if flaglist[1]
-				if !has_key(s:ipats['\'], ft)
-					let s:ipats['\'][ft] = [['', '\m^\\', s:StepRight]]
-				endif
-			endif
-			let [rodict[ft], rcdict[ft]] = s:CalcRpats(a:c1, a:c2, flaglist)
-		endfor
-	endfor
-	let s:rpats[0][a:c1] = rodict
-	let s:rpats[1][a:c2] = rcdict
-
-	let s:ipats[a:c1] = iodict
-	let pat = 'inoremap <expr> <silent> <special> %s jhv#pair#Insert(%s)'
-	if a:c2 != a:c1
-		let s:ipats[a:c2] = icdict
-		let items = [a:c1, a:c2]
-	else
-		let items = [a:c1]
-	endif
-	for item in items
-		let lhs = substitute(substitute(item, '<', '<lt>', 'g'), '\\', '<Bslash>', 'g')
-		let rhs = substitute(substitute(string(item), '<', '<lt>', 'g'), '\\', '<Bslash>', 'g')
-		let cmd = printf(pat, lhs, rhs)
-		if g:jhv#pair#extend
-			call jhv#mappings#TMap('add=>', cmd)
-		else
-			exe cmd
-		endif
-	endfor
-endfunction
-
 
 function jhv#pair#Insert(c)
 	let ftpats = s:ipats[a:c]
